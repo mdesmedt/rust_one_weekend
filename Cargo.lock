@@ -744,7 +744,6 @@ dependencies = [
  "rand 0.8.3",
  "rayon",
  "spiral",
- "tobj",
 ]
 
 [[package]]
@@ -1282,12 +1281,6 @@ checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
 dependencies = [
  "once_cell",
 ]
-
-[[package]]
-name = "tobj"
-version = "2.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2468f55be8e59cf7219f1685cf1af4eb00ef2314823a7941a41c8d69538f881b"
 
 [[package]]
 name = "typenum"
