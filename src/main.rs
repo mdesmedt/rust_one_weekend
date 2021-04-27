@@ -1,3 +1,4 @@
+mod bvhiter;
 mod camera;
 mod material;
 mod object;
