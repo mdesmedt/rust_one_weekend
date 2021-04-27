@@ -177,11 +177,10 @@ impl Renderer {
             spiral_blocks.push(blocks[block_index])
         }
 
-        let atomic_ray_count = AtomicCell::new(0u64);
+        let ref atomic_ray_count = AtomicCell::new(0u64);
 
         // Loop blocks in the image blocker and spawn renderblock tasks in FIFO order
         rayon::scope_fifo(|s| {
-            let atomic_ray_count_ref = &atomic_ray_count;
             for renderblock in spiral_blocks {
                 s.spawn_fifo(move |_| {
                     if self.keep_rendering.load() {
@@ -213,7 +212,7 @@ impl Renderer {
                             }
                             color_accum /= self.samples_per_pixel as f32;
 
-                            atomic_ray_count_ref.fetch_add(ray_count as u64);
+                            atomic_ray_count.fetch_add(ray_count as u64);
 
                             // Send the result back
                             let result = PixelResult {

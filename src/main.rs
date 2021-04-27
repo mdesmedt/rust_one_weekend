@@ -5,6 +5,10 @@ mod render;
 mod scene;
 mod shared;
 
+use std::fs::File;
+use std::io::BufWriter;
+use std::path::Path;
+
 use camera::*;
 use material::*;
 use object::*;
@@ -150,7 +154,7 @@ fn main() {
         // Window loop
         while window.is_open() && !window.is_key_down(Key::Escape) {
             // Fetch rendered pixels
-            let render_results = render_worker.poll_results();
+            let ref render_results = render_worker.poll_results();
             let has_changed = render_results.len() > 0;
             for result in render_results {
                 let index = index_from_xy(WIDTH as u32, HEIGHT as u32, result.x, result.y);
@@ -169,4 +173,24 @@ fn main() {
         render_worker.stop_render();
     })
     .unwrap();
+
+    // If we get one argument, assume it's our output png filename
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        let path = Path::new(&args[1]);
+        let file = File::create(path).unwrap();
+        let ref mut w = BufWriter::new(file);
+
+        // Write buffer_display as 8-bit RGB PNG
+        let mut encoder = png::Encoder::new(w, WIDTH as u32, HEIGHT as u32);
+        encoder.set_color(png::ColorType::RGB);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+
+        let data: Vec<u8> = buffer_display
+            .iter()
+            .flat_map(|x| u8_vec_from_color_display(*x))
+            .collect();
+        writer.write_image_data(&data).unwrap();
+    }
 }

@@ -40,6 +40,13 @@ pub struct RayQuery {
     pub t_max: f32,
 }
 
+pub fn u8_vec_from_color_display(c: ColorDisplay) -> Vec<u8> {
+    let b = c as u8;
+    let g = (c >> 8) as u8;
+    let r = (c >> 16) as u8;
+    return vec![r, g, b];
+}
+
 pub fn color_display_from_u8_rgb(r: u8, g: u8, b: u8) -> ColorDisplay {
     let (r, g, b) = (r as u32, g as u32, b as u32);
     (r << 16) | (g << 8) | b
@@ -50,7 +57,7 @@ pub fn color_display_from_f32_rgb(r: f32, g: f32, b: f32) -> ColorDisplay {
 }
 
 pub fn color_display_from_render(c: Color) -> ColorDisplay {
-    let gamma = 1.0/2.0;
+    let gamma = 1.0 / 2.2;
     let col_gamma = Color::new(c.x.powf(gamma), c.y.powf(gamma), c.z.powf(gamma));
     color_display_from_f32_rgb(col_gamma.x, col_gamma.y, col_gamma.z)
 }
