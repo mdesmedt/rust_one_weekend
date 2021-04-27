@@ -84,7 +84,7 @@ pub struct PixelResult {
 }
 
 /// Recursive ray tracing
-fn ray_color(ray: Ray, scene: &Scene, depth: i32) -> Color {
+fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
     if depth <= 0 {
         return Color::ZERO;
     }
@@ -96,6 +96,7 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32) -> Color {
         t_max: TRACE_INFINITY,
     };
     let hit_option = scene.intersect(query);
+    *ray_count += 1;
 
     // If we hit something
     if let Some(hit) = hit_option {
@@ -103,7 +104,8 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32) -> Color {
 
         // Recurse
         if let Some(scatter) = scatter_option {
-            return scatter.attenuation * ray_color(scatter.scattered_ray, scene, depth - 1);
+            return scatter.attenuation
+                * ray_color(scatter.scattered_ray, scene, depth - 1, ray_count);
         }
 
         return Color::ZERO;
@@ -175,8 +177,11 @@ impl Renderer {
             spiral_blocks.push(blocks[block_index])
         }
 
+        let atomic_ray_count = AtomicCell::new(0u64);
+
         // Loop blocks in the image blocker and spawn renderblock tasks in FIFO order
         rayon::scope_fifo(|s| {
+            let atomic_ray_count_ref = &atomic_ray_count;
             for renderblock in spiral_blocks {
                 s.spawn_fifo(move |_| {
                     if self.keep_rendering.load() {
@@ -195,6 +200,7 @@ impl Renderer {
                                 / (self.image_height as f32 - 1.0);
                             let u_rand = 1.0 / (self.image_width as f32 - 1.0);
                             let v_rand = 1.0 / (self.image_height as f32 - 1.0);
+                            let mut ray_count = 0;
 
                             // Supersample this pixel
                             for _ in 0..self.samples_per_pixel {
@@ -202,9 +208,12 @@ impl Renderer {
                                 let v = v_base + rng.gen_range(0.0..v_rand);
                                 let ray = self.camera.get_ray(u, v);
                                 // Start the primary here from here
-                                color_accum += ray_color(ray, &self.scene, self.max_depth);
+                                color_accum +=
+                                    ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
                             }
                             color_accum /= self.samples_per_pixel as f32;
+
+                            atomic_ray_count_ref.fetch_add(ray_count as u64);
 
                             // Send the result back
                             let result = PixelResult {
@@ -222,15 +231,15 @@ impl Renderer {
         }); // scope_fifo
 
         let time_elapsed = time_start.elapsed();
-        let primary_ray_count = self.image_width * self.image_height * self.samples_per_pixel;
-        let primary_ray_count_f32 = primary_ray_count as f32;
-        let rays_sec = primary_ray_count_f32 / time_elapsed.as_secs_f32();
+        let ray_count = atomic_ray_count.load();
+        let ray_count_f32 = ray_count as f32;
+        let mrays_sec = (ray_count_f32 / time_elapsed.as_secs_f32()) / 1000000.0;
 
         println!("Stop render");
         println!(
-            "Time: {0}ms Primary rays/sec {1}",
+            "Time: {0}ms MRays/sec {1:.3}",
             time_elapsed.as_millis(),
-            rays_sec
+            mrays_sec
         );
     }
 
