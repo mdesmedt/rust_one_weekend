@@ -50,8 +50,9 @@ pub fn color_display_from_f32_rgb(r: f32, g: f32, b: f32) -> ColorDisplay {
 }
 
 pub fn color_display_from_render(c: Color) -> ColorDisplay {
-    let gamma = Color::new(c.x.sqrt(), c.y.sqrt(), c.z.sqrt());
-    color_display_from_f32_rgb(gamma.x, gamma.y, gamma.z)
+    let gamma = 1.0/2.0;
+    let col_gamma = Color::new(c.x.powf(gamma), c.y.powf(gamma), c.z.powf(gamma));
+    color_display_from_f32_rgb(col_gamma.x, col_gamma.y, col_gamma.z)
 }
 
 pub fn degrees_to_radians(degrees: f32) -> f32 {

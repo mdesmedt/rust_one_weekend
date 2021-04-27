@@ -76,7 +76,7 @@ fn one_weekend_scene() -> Scene {
             if (center - Point3::new(4.0, 0.2, 0.0)).length() > 0.9 {
                 if choose_mat < 0.8 {
                     // diffuse
-                    let albedo = color_random() * color_random();
+                    let albedo = color_random();
                     let sphere_material: Arc<dyn Material> =
                         Arc::new(Lambertian { albedo: albedo });
                     add_sphere(&mut spheres, center, 0.2, &sphere_material);
