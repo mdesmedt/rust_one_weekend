@@ -92,6 +92,7 @@ pub fn random_unit_vector() -> Vec3 {
     return random_in_unit_sphere().normalize();
 }
 
+#[allow(dead_code)]
 pub fn random_in_hemisphere(normal: Vec3) -> Vec3 {
     let in_unit_sphere = random_in_unit_sphere();
     if in_unit_sphere.dot(normal) > 0.0 {
