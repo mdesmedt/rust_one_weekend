@@ -5,6 +5,8 @@ mod render;
 mod scene;
 mod shared;
 
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -23,7 +25,7 @@ const SAMPLES_PER_PIXEL: u32 = 32;
 
 /// Generate the ray tracing in one weekend scene
 fn one_weekend_scene() -> Scene {
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(123);
     let mut scene = Scene::new();
 
     let mut spheres: Vec<(Point3, f32)> = Vec::new();
