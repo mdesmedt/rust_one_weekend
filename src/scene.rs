@@ -31,7 +31,7 @@ impl Scene {
                 query.ray.origin.to_nalgebra_point(),
                 query.ray.direction.to_nalgebra_vector(),
             );
-            let hit_objects = bvh.traverse(&bvh_ray, &self.objects);
+            let hit_objects = bvh.traverse_iterator(&bvh_ray, &self.objects);
 
             // Iterate over hit objects to find closest
             for obj_boxed in hit_objects {
