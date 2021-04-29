@@ -16,3 +16,7 @@ bvh = "0.4.0"
 rand = "0.8.3"
 spiral = "0.1.9"
 png = "0.16.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
