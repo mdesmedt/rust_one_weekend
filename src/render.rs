@@ -1,4 +1,4 @@
-use rayon::prelude::*;
+use scoped_threadpool::Pool;
 use spiral::ChebyshevIterator;
 
 use crossbeam::atomic::AtomicCell;
@@ -179,55 +179,54 @@ impl Renderer {
 
         let ref atomic_ray_count = AtomicCell::new(0u64);
 
-        // Loop blocks in the image blocker and spawn renderblock tasks in FIFO order
-        rayon::scope_fifo(|s| {
+        let mut threadpool = Pool::new(num_cpus::get() as u32);
+
+        threadpool.scoped(|scoped| {
+            // Loop blocks in the image blocker and spawn renderblock tasks in FIFO order
             for renderblock in spiral_blocks {
-                s.spawn_fifo(move |_| {
-                    if self.keep_rendering.load() {
-                        let num_pixels = renderblock.width * renderblock.height;
-                        (0..num_pixels).into_par_iter().for_each(|index| {
-                            // Compute pixel location
-                            let x = renderblock.x + index % renderblock.width;
-                            let y =
-                                renderblock.y + (index / renderblock.width) % renderblock.height;
+                let num_pixels = renderblock.width * renderblock.height;
+                (0..num_pixels).into_iter().for_each(|index| {
+                    scoped.execute(move || {
+                        // Compute pixel location
+                        let x = renderblock.x + index % renderblock.width;
+                        let y = renderblock.y + (index / renderblock.width) % renderblock.height;
 
-                            // Set up supersampling
-                            let mut color_accum = Color::ZERO;
-                            let mut rng = rand::thread_rng();
-                            let u_base = x as f32 / (self.image_width as f32 - 1.0);
-                            let v_base = (self.image_height - y - 1) as f32
-                                / (self.image_height as f32 - 1.0);
-                            let u_rand = 1.0 / (self.image_width as f32 - 1.0);
-                            let v_rand = 1.0 / (self.image_height as f32 - 1.0);
-                            let mut ray_count = 0;
+                        // Set up supersampling
+                        let mut color_accum = Color::ZERO;
+                        let mut rng = rand::thread_rng();
+                        let u_base = x as f32 / (self.image_width as f32 - 1.0);
+                        let v_base =
+                            (self.image_height - y - 1) as f32 / (self.image_height as f32 - 1.0);
+                        let u_rand = 1.0 / (self.image_width as f32 - 1.0);
+                        let v_rand = 1.0 / (self.image_height as f32 - 1.0);
+                        let mut ray_count = 0;
 
-                            // Supersample this pixel
-                            for _ in 0..self.samples_per_pixel {
-                                let u = u_base + rng.gen_range(0.0..u_rand);
-                                let v = v_base + rng.gen_range(0.0..v_rand);
-                                let ray = self.camera.get_ray(u, v);
-                                // Start the primary here from here
-                                color_accum +=
-                                    ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
-                            }
-                            color_accum /= self.samples_per_pixel as f32;
+                        // Supersample this pixel
+                        for _ in 0..self.samples_per_pixel {
+                            let u = u_base + rng.gen_range(0.0..u_rand);
+                            let v = v_base + rng.gen_range(0.0..v_rand);
+                            let ray = self.camera.get_ray(u, v);
+                            // Start the primary here from here
+                            color_accum +=
+                                ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
+                        }
+                        color_accum /= self.samples_per_pixel as f32;
 
-                            atomic_ray_count.fetch_add(ray_count as u64);
+                        atomic_ray_count.fetch_add(ray_count as u64);
 
-                            // Send the result back
-                            let result = PixelResult {
-                                x: x,
-                                y: y,
-                                color: color_accum,
-                            };
-                            if self.keep_rendering.load() {
-                                self.channel_sender.send(result).unwrap();
-                            }
-                        }); // par_iter over pixels
-                    } // if keep_rendering
-                }); // spawn_fifo
+                        // Send the result back
+                        let result = PixelResult {
+                            x: x,
+                            y: y,
+                            color: color_accum,
+                        };
+                        if self.keep_rendering.load() {
+                            self.channel_sender.send(result).unwrap();
+                        }
+                    });
+                }); // par_iter over pixels
             } // loop blocker
-        }); // scope_fifo
+        });
 
         let time_elapsed = time_start.elapsed();
         let ray_count = atomic_ray_count.load();
