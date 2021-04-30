@@ -202,13 +202,15 @@ impl Renderer {
                         let mut ray_count = 0;
 
                         // Supersample this pixel
-                        for _ in 0..self.samples_per_pixel {
-                            let u = u_base + rng.gen_range(0.0..u_rand);
-                            let v = v_base + rng.gen_range(0.0..v_rand);
-                            let ray = self.camera.get_ray(u, v);
-                            // Start the primary here from here
-                            color_accum +=
-                                ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
+                        if self.keep_rendering.load() {
+                            for _ in 0..self.samples_per_pixel {
+                                let u = u_base + rng.gen_range(0.0..u_rand);
+                                let v = v_base + rng.gen_range(0.0..v_rand);
+                                let ray = self.camera.get_ray(u, v);
+                                // Start the primary here from here
+                                color_accum +=
+                                    ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
+                            }
                         }
                         color_accum /= self.samples_per_pixel as f32;
 
