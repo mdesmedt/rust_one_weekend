@@ -105,8 +105,6 @@ pub fn random_in_hemisphere(normal: Vec3) -> Vec3 {
 /// Vec3 extensions
 pub trait VecExt {
     fn near_zero(&self) -> bool;
-    fn to_nalgebra_point(&self) -> bvh::nalgebra::Point3<f32>;
-    fn to_nalgebra_vector(&self) -> bvh::nalgebra::Vector3<f32>;
 }
 
 impl VecExt for Vec3 {
@@ -114,14 +112,6 @@ impl VecExt for Vec3 {
     fn near_zero(&self) -> bool {
         let s = 1e-8;
         (self.x.abs() < s) && (self.y.abs() < s) && (self.z.abs() < s)
-    }
-
-    fn to_nalgebra_point(&self) -> bvh::nalgebra::Point3<f32> {
-        bvh::nalgebra::Point3::new(self.x, self.y, self.z)
-    }
-
-    fn to_nalgebra_vector(&self) -> bvh::nalgebra::Vector3<f32> {
-        bvh::nalgebra::Vector3::new(self.x, self.y, self.z)
     }
 }
 

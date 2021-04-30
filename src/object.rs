@@ -91,7 +91,7 @@ impl Bounded for Sphere {
         let half_size = Vec3::new(self.radius, self.radius, self.radius);
         let min = self.center - half_size;
         let max = self.center + half_size;
-        AABB::with_bounds(min.to_nalgebra_point(), max.to_nalgebra_point())
+        AABB::with_bounds(min, max)
     }
 }
 

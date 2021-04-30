@@ -28,8 +28,8 @@ impl Scene {
         if let Some(bvh) = &self.bvh {
             // Traverse the BVH
             let bvh_ray = bvh::ray::Ray::new(
-                query.ray.origin.to_nalgebra_point(),
-                query.ray.direction.to_nalgebra_vector(),
+                query.ray.origin,
+                query.ray.direction,
             );
             let hit_objects = bvh.traverse_iterator(&bvh_ray, &self.objects);
 
