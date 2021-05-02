@@ -28,16 +28,42 @@ impl HitRecord {
     }
 }
 
+/// Bounds for RayHittable
+#[derive(Copy, Clone)]
+pub struct HittableBounds {
+    aabb: AABB,
+    node_index: usize,
+    pub hittable_index: usize,
+}
+
+impl Bounded for HittableBounds {
+    fn aabb(&self) -> AABB {
+        return self.aabb;
+    }
+}
+
+impl BHShape for HittableBounds {
+    fn set_bh_node_index(&mut self, index: usize) {
+        self.node_index = index;
+    }
+
+    fn bh_node_index(&self) -> usize {
+        self.node_index
+    }
+}
+
 /// An object in the scene which can be hit with a ray
-pub trait RayHittable: Send + Sync + Bounded + BHShape {
+pub trait RayHittable: Send + Sync {
+    // Intersect ray with object
     fn intersect(&self, query: RayQuery) -> Option<HitRecord>;
+    // Return bounds
+    fn compute_bounds(&self, index: usize) -> HittableBounds;
 }
 
 pub struct Sphere {
     pub center: Point3,
     pub radius: f32,
     pub material: Arc<dyn Material>,
-    node_index: usize,
     radius_rcp: f32,
     radius_sq: f32,
 }
@@ -48,7 +74,6 @@ impl Sphere {
             center: center,
             radius: radius,
             material: material.clone(),
-            node_index: 0,
             radius_rcp: 1.0 / radius,
             radius_sq: radius * radius,
         }
@@ -84,41 +109,18 @@ impl RayHittable for Sphere {
 
         return Some(record);
     }
-}
 
-impl Bounded for Sphere {
-    fn aabb(&self) -> AABB {
+    fn compute_bounds(&self, hittable_index: usize) -> HittableBounds
+    {
         let half_size = Vec3::new(self.radius, self.radius, self.radius);
         let min = self.center - half_size;
         let max = self.center + half_size;
-        AABB::with_bounds(min, max)
-    }
-}
+        let aabb = AABB::with_bounds(min, max);
 
-impl BHShape for Sphere {
-    fn set_bh_node_index(&mut self, index: usize) {
-        self.node_index = index;
-    }
-
-    fn bh_node_index(&self) -> usize {
-        self.node_index
-    }
-}
-
-/// Helper trait for BVH build from a Vec<Box<dyn RayHittable>>
-impl Bounded for Box<dyn RayHittable> {
-    fn aabb(&self) -> AABB {
-        self.as_ref().aabb()
-    }
-}
-
-/// Helper trait for BVH build from a Vec<Box<dyn RayHittable>>
-impl BHShape for Box<dyn RayHittable> {
-    fn set_bh_node_index(&mut self, index: usize) {
-        self.as_mut().set_bh_node_index(index);
-    }
-
-    fn bh_node_index(&self) -> usize {
-        self.as_ref().bh_node_index()
+        HittableBounds {
+            aabb,
+            node_index: 0,
+            hittable_index: hittable_index
+        }
     }
 }

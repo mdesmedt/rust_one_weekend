@@ -5,7 +5,13 @@ use bvh::bvh::BVH;
 
 /// Basic scene which holds objects and a BVH
 pub struct Scene {
+    // List of hittables
     pub objects: Vec<Box<dyn RayHittable>>,
+
+    // List of bounds for hittables
+    pub bounds: Vec<HittableBounds>,
+
+    // Acceleration structure
     pub bvh: Option<BVH>,
 }
 
@@ -13,12 +19,18 @@ impl Scene {
     pub fn new() -> Self {
         Scene {
             objects: Vec::new(),
+            bounds: Vec::new(),
             bvh: None,
         }
     }
 
     pub fn build_bvh(&mut self) {
-        self.bvh = Some(BVH::build(&mut self.objects));
+        // Compute bounds
+        for (i, hittable) in self.objects.iter().enumerate() {
+            self.bounds.push(hittable.compute_bounds(i));
+        }
+        // Build BVH
+        self.bvh = Some(BVH::build(&mut self.bounds));
     }
 
     /// Return the closest intersection (or None) in the scene using the ray
@@ -31,11 +43,11 @@ impl Scene {
                 query.ray.origin,
                 query.ray.direction,
             );
-            let hit_objects = bvh.traverse_iterator(&bvh_ray, &self.objects);
+            let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
 
             // Iterate over hit objects to find closest
-            for obj_boxed in hit_objects {
-                let obj = obj_boxed.as_ref();
+            for bounds in hit_bounds {
+                let obj = self.objects[bounds.hittable_index].as_ref();
                 let hit_option = obj.intersect(query);
                 if hit_option.is_some() {
                     // Shorten the ray
