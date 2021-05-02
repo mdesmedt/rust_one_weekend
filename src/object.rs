@@ -1,6 +1,8 @@
 use crate::material::*;
 use crate::shared::*;
 
+use rtbvh::*;
+
 /// Information of a ray hit
 pub struct HitRecord {
     pub point: Point3,
@@ -11,7 +13,7 @@ pub struct HitRecord {
 }
 
 impl HitRecord {
-    pub fn new(ray: Ray, t: f32, outward_normal: Vec3, material: Arc<dyn Material>) -> Self {
+    pub fn new(ray: crate::shared::Ray, t: f32, outward_normal: Vec3, material: Arc<dyn Material>) -> Self {
         let front_face = ray.direction.dot(outward_normal) < 0.0;
         let normal = if front_face {
             outward_normal
@@ -29,26 +31,20 @@ impl HitRecord {
 }
 
 /// Bounds for RayHittable
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct HittableBounds {
-    aabb: AABB,
+    aabb: Aabb,
     node_index: usize,
     pub hittable_index: usize,
 }
 
-impl Bounded for HittableBounds {
-    fn aabb(&self) -> AABB {
-        return self.aabb;
-    }
-}
-
-impl BHShape for HittableBounds {
-    fn set_bh_node_index(&mut self, index: usize) {
-        self.node_index = index;
+impl Primitive for HittableBounds {
+    fn center(&self) -> Vec3 {
+        self.aabb.center()
     }
 
-    fn bh_node_index(&self) -> usize {
-        self.node_index
+    fn aabb(&self) -> Aabb {
+        self.aabb
     }
 }
 
@@ -56,7 +52,7 @@ impl BHShape for HittableBounds {
 pub trait RayHittable: Send + Sync {
     // Intersect ray with object
     fn intersect(&self, query: RayQuery) -> Option<HitRecord>;
-    // Return bounds
+    // bounds
     fn compute_bounds(&self, index: usize) -> HittableBounds;
 }
 
@@ -115,7 +111,9 @@ impl RayHittable for Sphere {
         let half_size = Vec3::new(self.radius, self.radius, self.radius);
         let min = self.center - half_size;
         let max = self.center + half_size;
-        let aabb = AABB::with_bounds(min, max);
+        let mut aabb = Aabb::new();
+        aabb.grow(min);
+        aabb.grow(max);
 
         HittableBounds {
             aabb,

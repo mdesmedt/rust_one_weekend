@@ -1,7 +1,7 @@
 use crate::object::*;
 use crate::shared::*;
 
-use bvh::bvh::BVH;
+use rtbvh::*;
 
 /// Basic scene which holds objects and a BVH
 pub struct Scene {
@@ -12,7 +12,7 @@ pub struct Scene {
     pub bounds: Vec<HittableBounds>,
 
     // Acceleration structure
-    pub bvh: Option<BVH>,
+    pub bvh: Option<Bvh>,
 }
 
 impl Scene {
@@ -30,7 +30,13 @@ impl Scene {
             self.bounds.push(hittable.compute_bounds(i));
         }
         // Build BVH
-        self.bvh = Some(BVH::build(&mut self.bounds));
+        let aabbs = self.bounds.iter().map(|t| t.aabb()).collect::<Vec<Aabb>>();
+        let builder = Builder {
+            aabbs: aabbs.as_slice(),
+            primitives: self.bounds.as_slice(),
+            primitives_per_leaf: 1,
+        };
+        self.bvh = Some(builder.construct_binned_sah());
     }
 
     /// Return the closest intersection (or None) in the scene using the ray
@@ -39,14 +45,14 @@ impl Scene {
 
         if let Some(bvh) = &self.bvh {
             // Traverse the BVH
-            let bvh_ray = bvh::ray::Ray::new(
+            let mut bvh_ray = rtbvh::Ray::new(
                 query.ray.origin,
                 query.ray.direction,
             );
-            let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
+            let hit_bounds = bvh.traverse_iter(&mut bvh_ray, &self.bounds);
 
             // Iterate over hit objects to find closest
-            for bounds in hit_bounds {
+            for (bounds, _) in hit_bounds {
                 let obj = self.objects[bounds.hittable_index].as_ref();
                 let hit_option = obj.intersect(query);
                 if hit_option.is_some() {
