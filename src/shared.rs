@@ -73,6 +73,7 @@ pub fn vec3_random_range(min: f32, max: f32) -> Vec3 {
     );
 }
 
+#[allow(dead_code)]
 pub fn vec3_random() -> Vec3 {
     return vec3_random_range(0.0, 1.0);
 }
@@ -145,10 +146,14 @@ pub fn random_in_unit_disk() -> Vec3 {
     }
 }
 
-pub fn color_random() -> Color {
-    vec3_random()
+pub fn color_random<T: Rng>(rng: &mut T) -> Color {
+    color_random_range(rng, 0.0, 1.0)
 }
 
-pub fn color_random_range(min: f32, max: f32) -> Color {
-    vec3_random_range(min, max)
+pub fn color_random_range<T: Rng>(rng: &mut T, min: f32, max: f32) -> Color {
+    return Color::new(
+        rng.gen_range(min..max),
+        rng.gen_range(min..max),
+        rng.gen_range(min..max),
+    );
 }
