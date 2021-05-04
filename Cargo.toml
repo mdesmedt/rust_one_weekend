@@ -17,6 +17,7 @@ rand = "0.8.3"
 spiral = "0.1.9"
 png = "0.16.8"
 num_cpus = "1.13.0"
+rand_pcg = "0.3.0"
 
 [profile.release]
 lto = true

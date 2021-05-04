@@ -24,7 +24,7 @@ const SAMPLES_PER_PIXEL: u32 = 128;
 
 /// Generate the ray tracing in one weekend scene
 fn one_weekend_scene() -> Scene {
-    let mut rng = rand::rngs::StdRng::seed_from_u64(4321);
+    let mut rng = rand_pcg::Pcg32::seed_from_u64(2);
     let mut scene = Scene::new();
 
     let mut spheres: Vec<(Point3, f32)> = Vec::new();
