@@ -5,8 +5,11 @@ use bvh::bvh::BVH;
 
 /// Basic scene which holds objects and a BVH
 pub struct Scene {
-    // List of hittables
-    pub objects: Vec<Box<dyn RayHittable>>,
+    // List of generic hittables
+    pub objects_other: Vec<Box<dyn RayHittable>>,
+
+    // List of spheres
+    pub objects_sphere: Vec<Sphere>,
 
     // List of bounds for hittables
     pub bounds: Vec<HittableBounds>,
@@ -18,16 +21,25 @@ pub struct Scene {
 impl Scene {
     pub fn new() -> Self {
         Scene {
-            objects: Vec::new(),
+            objects_other: Vec::new(),
+            objects_sphere: Vec::new(),
             bounds: Vec::new(),
             bvh: None,
         }
     }
 
+    pub fn add_sphere(&mut self, s: Sphere)
+    {
+        self.objects_sphere.push(s);
+    }
+
     pub fn build_bvh(&mut self) {
         // Compute bounds
-        for (i, hittable) in self.objects.iter().enumerate() {
+        for (i, hittable) in self.objects_other.iter().enumerate() {
             self.bounds.push(hittable.compute_bounds(i));
+        }
+        for (i, sphere) in self.objects_sphere.iter().enumerate() {
+            self.bounds.push(sphere.compute_bounds(i));
         }
         // Build BVH
         self.bvh = Some(BVH::build(&mut self.bounds));
@@ -44,7 +56,7 @@ impl Scene {
 
             // Iterate over hit objects to find closest
             for bounds in hit_bounds {
-                let obj = self.objects[bounds.hittable_index].as_ref();
+                let obj = &self.objects_sphere[bounds.hittable_index];
                 let hit_option = obj.intersect(query);
                 if hit_option.is_some() {
                     // Shorten the ray

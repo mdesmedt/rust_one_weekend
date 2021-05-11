@@ -1,6 +1,12 @@
 use crate::material::*;
 use crate::shared::*;
 
+#[derive(Copy, Clone)]
+pub enum HittableType {
+    Sphere,
+    Other
+}
+
 /// Information of a ray hit
 pub struct HitRecord {
     pub point: Point3,
@@ -34,6 +40,7 @@ pub struct HittableBounds {
     aabb: AABB,
     node_index: usize,
     pub hittable_index: usize,
+    pub hittable_type: HittableType,
 }
 
 impl Bounded for HittableBounds {
@@ -120,6 +127,7 @@ impl RayHittable for Sphere {
             aabb,
             node_index: 0,
             hittable_index: hittable_index,
+            hittable_type: HittableType::Sphere,
         }
     }
 }

@@ -30,7 +30,7 @@ fn one_weekend_scene() -> Scene {
     let mut spheres: Vec<(Point3, f32)> = Vec::new();
     let mut add_sphere =
         |spheres: &mut Vec<(Point3, f32)>, c: Point3, r: f32, mat: &Arc<dyn Material>| {
-            scene.objects.push(Box::new(Sphere::new(c, r, mat)));
+            scene.add_sphere(Sphere::new(c, r, mat));
             spheres.push((c, r));
         };
 
