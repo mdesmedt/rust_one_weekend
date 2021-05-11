@@ -117,6 +117,55 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color 
     return (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0);
 }
 
+/// Recursive ray tracing
+fn render_packet(
+    packet: &mut RayPacket,
+    scene: &Scene,
+    depth: i32,
+    ray_count: &mut u32,
+) -> [Color; TRACE_PACKET_SIZE] {
+    if depth <= 0 {
+        return [Color::ZERO; TRACE_PACKET_SIZE];
+    }
+
+    *ray_count += packet.ray_live_count as u32;
+
+    let mut color_results = [Color::ZERO; TRACE_PACKET_SIZE];
+    let mut attenuations: [Color; TRACE_PACKET_SIZE] = [Color::ONE; TRACE_PACKET_SIZE];
+    let intersect_results = scene.intersect_packet(packet);
+    for i in 0..TRACE_PACKET_SIZE {
+        if packet.is_ray_live[i] {
+            let ray = packet.rays[i];
+            let hit_option = &intersect_results[i];
+            if let Some(hit) = hit_option {
+                let scatter_option = hit.material.scatter(&ray, &hit);
+                if let Some(scatter) = scatter_option {
+                    attenuations[i] = scatter.attenuation;
+                    packet.update_ray(i, scatter.scattered_ray);
+                } else {
+                    packet.end_ray(i);
+                }
+            } else {
+                // Background
+                let unit_direction = ray.direction.normalize();
+                let t = 0.5 * (unit_direction.y + 1.0);
+                color_results[i] =
+                    (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0);
+                packet.end_ray(i);
+            }
+        }
+    }
+
+    if packet.ray_live_count > 0 {
+        let color_recursed = render_packet(packet, scene, depth - 1, ray_count);
+        for i in 0..TRACE_PACKET_SIZE {
+            color_results[i] += color_recursed[i] * attenuations[i];
+        }
+    }
+
+    return color_results;
+}
+
 /// Renderer which generates pixels using the scene and camera, and sends them back using a crossbeam channel
 pub struct Renderer {
     image_width: u32,
@@ -205,13 +254,35 @@ impl Renderer {
                             let v_rand = 1.0 / (self.image_height as f32 - 1.0);
 
                             // Supersample this pixel
-                            for _ in 0..self.samples_per_pixel {
-                                let u = u_base + rng.gen_range(0.0..u_rand);
-                                let v = v_base + rng.gen_range(0.0..v_rand);
-                                let ray = self.camera.get_ray(u, v);
-                                // Start the primary here from here
-                                color_accum +=
-                                    ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
+                            if TRACE_PACKET {
+                                for _ in 0..(self.samples_per_pixel / TRACE_PACKET_SIZE as u32) {
+                                    let rays = <[Ray; TRACE_PACKET_SIZE]>::init_with(|| {
+                                        let u = u_base + rng.gen_range(0.0..u_rand);
+                                        let v = v_base + rng.gen_range(0.0..v_rand);
+                                        self.camera.get_ray(u, v)
+                                    });
+
+                                    let mut packet = RayPacket::new(rays);
+                                    // Start the primary here from here
+                                    let color_results = render_packet(
+                                        &mut packet,
+                                        &self.scene,
+                                        self.max_depth,
+                                        &mut ray_count,
+                                    );
+                                    for c in std::array::IntoIter::new(color_results) {
+                                        color_accum += c;
+                                    }
+                                }
+                            } else {
+                                for _ in 0..self.samples_per_pixel {
+                                    let u = u_base + rng.gen_range(0.0..u_rand);
+                                    let v = v_base + rng.gen_range(0.0..v_rand);
+                                    let ray = self.camera.get_ray(u, v);
+                                    // Start the primary here from here
+                                    color_accum +=
+                                        ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
+                                }
                             }
                             color_accum /= self.samples_per_pixel as f32;
 

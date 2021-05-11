@@ -39,10 +39,7 @@ impl Scene {
 
         if let Some(bvh) = &self.bvh {
             // Traverse the BVH
-            let bvh_ray = bvh::ray::Ray::new(
-                query.ray.origin,
-                query.ray.direction,
-            );
+            let bvh_ray = bvh::ray::Ray::new(query.ray.origin, query.ray.direction);
             let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
 
             // Iterate over hit objects to find closest
@@ -65,5 +62,17 @@ impl Scene {
             }
         }
         return closest_hit_option;
+    }
+
+    pub fn intersect_packet(&self, packet: &RayPacket) -> [Option<HitRecord>; TRACE_PACKET_SIZE] {
+        <[Option<HitRecord>; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
+            let ray = packet.rays[i];
+            let query = RayQuery {
+                ray: ray,
+                t_min: TRACE_EPSILON,
+                t_max: TRACE_INFINITY,
+            };
+            self.intersect(query)
+        })
     }
 }

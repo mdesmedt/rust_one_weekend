@@ -110,8 +110,7 @@ impl RayHittable for Sphere {
         return Some(record);
     }
 
-    fn compute_bounds(&self, hittable_index: usize) -> HittableBounds
-    {
+    fn compute_bounds(&self, hittable_index: usize) -> HittableBounds {
         let half_size = Vec3::new(self.radius, self.radius, self.radius);
         let min = self.center - half_size;
         let max = self.center + half_size;
@@ -120,7 +119,7 @@ impl RayHittable for Sphere {
         HittableBounds {
             aabb,
             node_index: 0,
-            hittable_index: hittable_index
+            hittable_index: hittable_index,
         }
     }
 }

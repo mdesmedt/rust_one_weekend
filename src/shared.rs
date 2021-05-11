@@ -1,6 +1,8 @@
 pub use bvh::aabb::{Bounded, AABB};
 pub use bvh::bounding_hierarchy::{BHShape, BoundingHierarchy};
 pub use glam::Vec3;
+pub use init_with::InitWith;
+pub use packed_simd::*;
 pub use rand::Rng;
 pub use std::sync::Arc;
 
@@ -10,6 +12,11 @@ pub type ColorDisplay = u32;
 
 pub const TRACE_EPSILON: f32 = 0.001;
 pub const TRACE_INFINITY: f32 = f32::MAX;
+
+pub const TRACE_PACKET: bool = true;
+pub const TRACE_PACKET_SIZE: usize = 4;
+type TracePacketType = f32x4;
+type TracePacketTypeMask = m8x4;
 
 pub fn index_from_xy(image_width: u32, _image_height: u32, x: u32, y: u32) -> usize {
     (y * image_width + x) as usize
@@ -38,6 +45,160 @@ pub struct RayQuery {
     pub ray: Ray,
     pub t_min: f32,
     pub t_max: f32,
+}
+
+pub struct RayPacket {
+    pub ray_origin_x: TracePacketType,
+    pub ray_origin_y: TracePacketType,
+    pub ray_origin_z: TracePacketType,
+
+    pub ray_direction_x: TracePacketType,
+    pub ray_direction_y: TracePacketType,
+    pub ray_direction_z: TracePacketType,
+
+    pub mask: TracePacketTypeMask,
+
+    pub rays: [Ray; TRACE_PACKET_SIZE],
+    pub is_ray_live: [bool; TRACE_PACKET_SIZE],
+    pub ray_live_count: usize,
+}
+
+impl RayPacket {
+    pub fn new(rays: [Ray; TRACE_PACKET_SIZE]) -> Self {
+        RayPacket {
+            ray_live_count: TRACE_PACKET_SIZE,
+            is_ray_live: [true; TRACE_PACKET_SIZE],
+            rays: rays.clone(),
+            mask: TracePacketTypeMask::new(
+                true, true, true, true,
+                //true, true, true, true, true, true, true, true, true, true, true, true,
+            ),
+            ray_origin_x: TracePacketType::new(
+                rays[0].origin.x,
+                rays[1].origin.x,
+                rays[2].origin.x,
+                rays[3].origin.x,
+                // rays[4].origin.x,
+                // rays[5].origin.x,
+                // rays[6].origin.x,
+                // rays[7].origin.x,
+                // rays[8].origin.x,
+                // rays[9].origin.x,
+                // rays[10].origin.x,
+                // rays[11].origin.x,
+                // rays[12].origin.x,
+                // rays[13].origin.x,
+                // rays[14].origin.x,
+                // rays[15].origin.x,
+            ),
+            ray_origin_y: TracePacketType::new(
+                rays[0].origin.y,
+                rays[1].origin.y,
+                rays[2].origin.y,
+                rays[3].origin.y,
+                // rays[4].origin.y,
+                // rays[5].origin.y,
+                // rays[6].origin.y,
+                // rays[7].origin.y,
+                // rays[8].origin.y,
+                // rays[9].origin.y,
+                // rays[10].origin.y,
+                // rays[11].origin.y,
+                // rays[12].origin.y,
+                // rays[13].origin.y,
+                // rays[14].origin.y,
+                // rays[15].origin.y,
+            ),
+            ray_origin_z: TracePacketType::new(
+                rays[0].origin.z,
+                rays[1].origin.z,
+                rays[2].origin.z,
+                rays[3].origin.z,
+                // rays[4].origin.z,
+                // rays[5].origin.z,
+                // rays[6].origin.z,
+                // rays[7].origin.z,
+                // rays[8].origin.z,
+                // rays[9].origin.z,
+                // rays[10].origin.z,
+                // rays[11].origin.z,
+                // rays[12].origin.z,
+                // rays[13].origin.z,
+                // rays[14].origin.z,
+                // rays[15].origin.z,
+            ),
+            ray_direction_x: TracePacketType::new(
+                rays[0].direction.x,
+                rays[1].direction.x,
+                rays[2].direction.x,
+                rays[3].direction.x,
+                // rays[4].direction.x,
+                // rays[5].direction.x,
+                // rays[6].direction.x,
+                // rays[7].direction.x,
+                // rays[8].direction.x,
+                // rays[9].direction.x,
+                // rays[10].direction.x,
+                // rays[11].direction.x,
+                // rays[12].direction.x,
+                // rays[13].direction.x,
+                // rays[14].direction.x,
+                // rays[15].direction.x,
+            ),
+            ray_direction_y: TracePacketType::new(
+                rays[0].direction.y,
+                rays[1].direction.y,
+                rays[2].direction.y,
+                rays[3].direction.y,
+                // rays[4].direction.y,
+                // rays[5].direction.y,
+                // rays[6].direction.y,
+                // rays[7].direction.y,
+                // rays[8].direction.y,
+                // rays[9].direction.y,
+                // rays[10].direction.y,
+                // rays[11].direction.y,
+                // rays[12].direction.y,
+                // rays[13].direction.y,
+                // rays[14].direction.y,
+                // rays[15].direction.y,
+            ),
+            ray_direction_z: TracePacketType::new(
+                rays[0].direction.z,
+                rays[1].direction.z,
+                rays[2].direction.z,
+                rays[3].direction.z,
+                // rays[4].direction.z,
+                // rays[5].direction.z,
+                // rays[6].direction.z,
+                // rays[7].direction.z,
+                // rays[8].direction.z,
+                // rays[9].direction.z,
+                // rays[10].direction.z,
+                // rays[11].direction.z,
+                // rays[12].direction.z,
+                // rays[13].direction.z,
+                // rays[14].direction.z,
+                // rays[15].direction.z,
+            ),
+        }
+    }
+
+    pub fn update_ray(&mut self, i: usize, ray: Ray) {
+        self.ray_origin_x = self.ray_origin_x.replace(i, ray.origin.x);
+        self.ray_origin_y = self.ray_origin_y.replace(i, ray.origin.y);
+        self.ray_origin_z = self.ray_origin_z.replace(i, ray.origin.z);
+        self.ray_direction_x = self.ray_direction_x.replace(i, ray.direction.x);
+        self.ray_direction_y = self.ray_direction_y.replace(i, ray.direction.y);
+        self.ray_direction_z = self.ray_direction_z.replace(i, ray.direction.z);
+        self.rays[i] = ray;
+    }
+
+    pub fn end_ray(&mut self, i: usize) {
+        self.mask = self.mask.replace(i, false);
+        self.is_ray_live[i] = false;
+        self.ray_live_count -= 1;
+    }
 }
 
 pub fn u8_vec_from_color_display(c: ColorDisplay) -> Vec<u8> {

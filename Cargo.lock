@@ -366,15 +366,27 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27e6eecbd94ac86b2e1f3b0065ed5f17c097c15d668dddb84208a141e271403b"
+checksum = "70155b56080764b8b758e91e4c63d06da0262c0c939f2cd991cd1382087147df"
+dependencies = [
+ "spirv-std",
+]
 
 [[package]]
 name = "glob"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
+
+[[package]]
+name = "heck"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87cbf45460356b7deeb5e3415b5563308c0a9b057c85e12b06ad551f98d0a6ac"
+dependencies = [
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "hermit-abi"
@@ -390,6 +402,12 @@ name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+
+[[package]]
+name = "init_with"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0175f63815ce00183bf755155ad0cb48c65226c5d17a724e369c25418d2b7699"
 
 [[package]]
 name = "js-sys"
@@ -427,6 +445,18 @@ dependencies = [
  "cfg-if 1.0.0",
  "winapi",
 ]
+
+[[package]]
+name = "libm"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
+
+[[package]]
+name = "libm"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 
 [[package]]
 name = "lock_api"
@@ -619,6 +649,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg 1.0.1",
+ "libm 0.2.1",
 ]
 
 [[package]]
@@ -645,8 +676,10 @@ dependencies = [
  "crossbeam",
  "crossbeam-channel 0.4.4",
  "glam",
+ "init_with",
  "minifb",
  "num_cpus",
+ "packed_simd_2",
  "png",
  "rand 0.8.3",
  "rand_pcg 0.3.0",
@@ -676,6 +709,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ff55baddef9e4ad00f88b6c743a2a8062d4c6ade126c2a528644b8e444d52ce"
 dependencies = [
  "stable_deref_trait",
+]
+
+[[package]]
+name = "packed_simd_2"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3278e0492f961fd4ae70909f56b2723a7e8d01a228427294e19cdfdebda89a17"
+dependencies = [
+ "cfg-if 0.1.10",
+ "libm 0.1.4",
 ]
 
 [[package]]
@@ -1062,6 +1105,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfe3068700d36b5bc091494a9283587cf2442eb0f0c030295665f26f835cd2e1"
 
 [[package]]
+name = "spirv-std"
+version = "0.4.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "726c4c71ff802a9754ffae31c04c4d867aa23b49f883a56202dce285066ad792"
+dependencies = [
+ "bitflags",
+ "num-traits",
+ "spirv-std-macros",
+ "spirv-types",
+]
+
+[[package]]
+name = "spirv-std-macros"
+version = "0.4.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eabd1540fccc466b5ae0b261972572fe9b8544c974610248de08a98ae4b813a"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "spirv-types",
+ "syn",
+]
+
+[[package]]
+name = "spirv-types"
+version = "0.4.0-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d7f880a5540c04261e7454b5f3a342b5540283911ca9ebfec83eba9fb607ca0"
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1135,6 +1209,12 @@ checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
 dependencies = [
  "once_cell",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb0d2e7be6ae3a5fa87eed5fb451aff96f2573d2694942e40543ae0bbe19c796"
 
 [[package]]
 name = "unicode-width"

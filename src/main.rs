@@ -5,10 +5,10 @@ mod render;
 mod scene;
 mod shared;
 
+use rand::SeedableRng;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use rand::SeedableRng;
 
 use camera::*;
 use material::*;
