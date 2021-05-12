@@ -141,7 +141,7 @@ fn main() {
     );
 
     let mut scene = one_weekend_scene();
-    scene.build_bvh();
+    scene.build_scene();
 
     let render_worker =
         render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);

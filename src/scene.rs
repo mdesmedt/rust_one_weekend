@@ -11,6 +11,9 @@ pub struct Scene {
     // List of spheres
     pub objects_sphere: Vec<Sphere>,
 
+    // List of SIMD spheres
+    pub simd_sphere: Vec<SphereSimd>,
+
     // List of bounds for hittables
     pub bounds: Vec<HittableBounds>,
 
@@ -23,6 +26,7 @@ impl Scene {
         Scene {
             objects_other: Vec::new(),
             objects_sphere: Vec::new(),
+            simd_sphere: Vec::new(),
             bounds: Vec::new(),
             bvh: None,
         }
@@ -33,7 +37,19 @@ impl Scene {
         self.objects_sphere.push(s);
     }
 
-    pub fn build_bvh(&mut self) {
+    fn build_simd(&mut self) {
+        let mut index_start = 0;
+        for chunk in self.objects_sphere.chunks(TRACE_PACKET_SIZE) {
+            let indices = (index_start..index_start+TRACE_PACKET_SIZE).collect();
+            let simd = SphereSimd::from_vec(chunk.to_vec(), indices);
+            self.simd_sphere.push(simd);
+            index_start += TRACE_PACKET_SIZE;
+        }
+    }
+
+    pub fn build_scene(&mut self) {
+        // Build SIMD vector
+        self.build_simd();
         // Compute bounds
         for (i, hittable) in self.objects_other.iter().enumerate() {
             self.bounds.push(hittable.compute_bounds(i));

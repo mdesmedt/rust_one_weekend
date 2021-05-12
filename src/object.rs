@@ -67,6 +67,7 @@ pub trait RayHittable: Send + Sync {
     fn compute_bounds(&self, index: usize) -> HittableBounds;
 }
 
+#[derive(Clone)]
 pub struct Sphere {
     pub center: Point3,
     pub radius: f32,
@@ -87,11 +88,72 @@ impl Sphere {
     }
 }
 
+pub struct SphereSimd {
+    pub center_x: TracePacketType,
+    pub center_y: TracePacketType,
+    pub center_z: TracePacketType,
+
+    pub radius: TracePacketType,
+    pub radius_rcp: TracePacketType,
+    pub radius_sq: TracePacketType,
+
+    pub indices: [usize; TRACE_PACKET_SIZE],
+}
+
+impl SphereSimd {
+    pub fn from_vec(spheres: Vec<Sphere>, indices: Vec<usize>) -> Self {
+        let arr = <[usize; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
+            if indices.len() > i {
+                indices[i]
+            }
+            else {
+                0
+            }
+        });
+
+        SphereSimd {
+            center_x: simd_from_fn(&spheres, |s| s.center.x),
+            center_y: simd_from_fn(&spheres, |s| s.center.y),
+            center_z: simd_from_fn(&spheres, |s| s.center.z),
+            radius: simd_from_fn(&spheres, |s| s.radius),
+            radius_rcp: simd_from_fn(&spheres, |s| s.radius_rcp),
+            radius_sq: simd_from_fn(&spheres, |s| s.radius_sq),
+            indices: arr,
+        }
+    }
+
+    fn intersect_packet(&self, packet: &RayPacket) -> TracePacketType {
+        let oc_x = packet.ray_origin_x - self.center_x;
+        let oc_y = packet.ray_origin_y - self.center_y;
+        let oc_z = packet.ray_origin_z - self.center_z;
+
+        let a = packet.direction_length_squared;
+
+        let half_b = oc_x * packet.ray_direction_x + oc_y * packet.ray_direction_y + oc_z * packet.ray_direction_z;
+
+        let oc_length_squared = oc_x*oc_x + oc_y*oc_y + oc_z*oc_z;
+        let c = oc_length_squared - self.radius_sq;
+
+        let discriminant = half_b * half_b - a * c;
+        let discriminant_mask = discriminant.lt(TracePacketType::EPSILON);
+
+        let sqrtd = discriminant.sqrt();
+        let root_a = (-half_b - sqrtd) / a;
+        let root_b = (-half_b + sqrtd) / a;
+
+        let root_mask_a = root_a.gt(packet.ray_t_min) & (root_a.lt(packet.ray_t_max));
+        let root_mask_b = root_b.gt(packet.ray_t_min) & (root_b.lt(packet.ray_t_max));
+        let root_mask = root_mask_a & root_mask_b & discriminant_mask;
+
+        return root_a.min(root_b) * TracePacketType::from_cast(root_mask);
+    }
+}
+
 impl RayHittable for Sphere {
     fn intersect(&self, query: RayQuery) -> Option<HitRecord> {
         let r = query.ray;
         let oc = r.origin - self.center;
-        let a = r.direction.length_squared();
+        let a = r.direction_length_squared;
         let half_b = oc.dot(r.direction);
         let c = oc.length_squared() - self.radius_sq;
         let discriminant = half_b * half_b - a * c;
