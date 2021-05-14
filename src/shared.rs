@@ -17,6 +17,7 @@ pub const TRACE_PACKET: bool = true;
 pub const TRACE_PACKET_SIZE: usize = 4;
 pub type TracePacketType = f32x4;
 pub type TracePacketTypeMask = m8x4;
+pub type TracePacketTypeIndex = u32x4;
 
 pub fn index_from_xy(image_width: u32, _image_height: u32, x: u32, y: u32) -> usize {
     (y * image_width + x) as usize
@@ -32,7 +33,11 @@ pub struct Ray {
 
 impl Ray {
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
-        Ray { origin, direction, direction_length_squared: direction.length_squared() }
+        Ray {
+            origin,
+            direction,
+            direction_length_squared: direction.length_squared(),
+        }
     }
 
     pub fn at(&self, t: f32) -> Point3 {
@@ -76,7 +81,8 @@ impl RayPacket {
             is_ray_live: [true; TRACE_PACKET_SIZE],
             rays: rays.clone(),
             mask: TracePacketTypeMask::new(
-                true, true, true, true,
+                true, true, true,
+                true,
                 //true, true, true, true, true, true, true, true, true, true, true, true,
             ),
             ray_t_min: TracePacketType::splat(TRACE_EPSILON),
@@ -220,12 +226,7 @@ pub fn simd_from_fn<T>(v: &Vec<T>, f: fn(&T) -> f32) -> TracePacketType {
     while vals.len() < TRACE_PACKET_SIZE {
         vals.push(0.0);
     }
-    TracePacketType::new(
-        vals[0],
-        vals[1],
-        vals[2],
-        vals[3],
-    )
+    TracePacketType::new(vals[0], vals[1], vals[2], vals[3])
 }
 
 pub fn u8_vec_from_color_display(c: ColorDisplay) -> Vec<u8> {

@@ -32,18 +32,18 @@ impl Scene {
         }
     }
 
-    pub fn add_sphere(&mut self, s: Sphere)
-    {
+    pub fn add_sphere(&mut self, s: Sphere) {
         self.objects_sphere.push(s);
     }
 
     fn build_simd(&mut self) {
-        let mut index_start = 0;
+        let mut index_start: u32 = 0;
+        let packet_size = TRACE_PACKET_SIZE as u32;
         for chunk in self.objects_sphere.chunks(TRACE_PACKET_SIZE) {
-            let indices = (index_start..index_start+TRACE_PACKET_SIZE).collect();
+            let indices = (index_start..index_start + packet_size).collect();
             let simd = SphereSimd::from_vec(chunk.to_vec(), indices);
             self.simd_sphere.push(simd);
-            index_start += TRACE_PACKET_SIZE;
+            index_start += packet_size;
         }
     }
 
@@ -93,14 +93,33 @@ impl Scene {
     }
 
     pub fn intersect_packet(&self, packet: &RayPacket) -> [Option<HitRecord>; TRACE_PACKET_SIZE] {
+        let mut min_t: TracePacketType = TracePacketType::MAX;
+        let mut indices: TracePacketTypeIndex = TracePacketTypeIndex::splat(0);
+        for sphere_simd in &self.simd_sphere {
+            let packet_t = sphere_simd.intersect_packet(packet);
+            let hit_mask = packet_t.ne(TracePacketType::MAX);
+            min_t = min_t.min(packet_t);
+            indices = hit_mask.select(sphere_simd.indices, indices);
+        }
+        let hit_mask = min_t.ne(TracePacketType::MAX);
         <[Option<HitRecord>; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
-            let ray = packet.rays[i];
-            let query = RayQuery {
-                ray: ray,
-                t_min: TRACE_EPSILON,
-                t_max: TRACE_INFINITY,
-            };
-            self.intersect(query)
+            let is_hit = hit_mask.extract(i);
+            let t = min_t.extract(i);
+            let index = indices.extract(i) as usize;
+            if is_hit {
+                let ray = packet.rays[i];
+                let point = ray.at(t);
+                let sphere = &self.objects_sphere[index];
+                let outward_normal = (point - sphere.center) * sphere.radius_rcp;
+                Some(HitRecord::new(
+                    ray,
+                    t,
+                    outward_normal,
+                    sphere.material.clone(),
+                ))
+            } else {
+                None
+            }
         })
     }
 }
