@@ -96,10 +96,9 @@ impl Scene {
         for sphere in &self.objects_sphere {
             let sphere_simd = SphereSimd::from_sphere(sphere, index);
             let packet_t = sphere_simd.intersect_packet(packet);
-            let hit_mask = packet_t.ne(TracePacketType::MAX);
-            let closer_mask = packet_t.lt(min_t);
-            min_t = closer_mask.select(packet_t, min_t);
-            indices = closer_mask.select(sphere_simd.indices, indices);
+            let mask = packet_t.ne(TracePacketType::MAX) & packet_t.lt(min_t);
+            min_t = mask.select(packet_t, min_t);
+            indices = mask.select(sphere_simd.indices, indices);
             index += 1;
         }
         let hit_mask = min_t.ne(TracePacketType::MAX);
