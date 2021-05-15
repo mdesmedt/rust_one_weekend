@@ -11,9 +11,6 @@ pub struct Scene {
     // List of spheres
     pub objects_sphere: Vec<Sphere>,
 
-    // List of SIMD spheres
-    pub simd_sphere: Vec<SphereSimd>,
-
     // List of bounds for hittables
     pub bounds: Vec<HittableBounds>,
 
@@ -26,7 +23,7 @@ impl Scene {
         Scene {
             objects_other: Vec::new(),
             objects_sphere: Vec::new(),
-            simd_sphere: Vec::new(),
+            //simd_sphere: Vec::new(),
             bounds: Vec::new(),
             bvh: None,
         }
@@ -36,20 +33,20 @@ impl Scene {
         self.objects_sphere.push(s);
     }
 
-    fn build_simd(&mut self) {
-        let mut index_start: u32 = 0;
-        let packet_size = TRACE_PACKET_SIZE as u32;
-        for chunk in self.objects_sphere.chunks(TRACE_PACKET_SIZE) {
-            let indices = (index_start..index_start + packet_size).collect();
-            let simd = SphereSimd::from_vec(chunk.to_vec(), indices);
-            self.simd_sphere.push(simd);
-            index_start += packet_size;
-        }
-    }
+    // fn build_simd(&mut self) {
+    //     let mut index_start: u32 = 0;
+    //     let packet_size = TRACE_PACKET_SIZE as u32;
+    //     for chunk in self.objects_sphere.chunks(TRACE_PACKET_SIZE) {
+    //         let indices = (index_start..index_start + packet_size).collect();
+    //         let simd = SphereSimd::from_vec(chunk.to_vec(), indices);
+    //         self.simd_sphere.push(simd);
+    //         index_start += packet_size;
+    //     }
+    // }
 
     pub fn build_scene(&mut self) {
         // Build SIMD vector
-        self.build_simd();
+        //self.build_simd();
         // Compute bounds
         for (i, hittable) in self.objects_other.iter().enumerate() {
             self.bounds.push(hittable.compute_bounds(i));
@@ -95,18 +92,22 @@ impl Scene {
     pub fn intersect_packet(&self, packet: &RayPacket) -> [Option<HitRecord>; TRACE_PACKET_SIZE] {
         let mut min_t: TracePacketType = TracePacketType::MAX;
         let mut indices: TracePacketTypeIndex = TracePacketTypeIndex::splat(0);
-        for sphere_simd in &self.simd_sphere {
+        let mut index = 0;
+        for sphere in &self.objects_sphere {
+            let sphere_simd = SphereSimd::from_sphere(sphere, index);
             let packet_t = sphere_simd.intersect_packet(packet);
             let hit_mask = packet_t.ne(TracePacketType::MAX);
-            min_t = min_t.min(packet_t);
-            indices = hit_mask.select(sphere_simd.indices, indices);
+            let closer_mask = packet_t.lt(min_t);
+            min_t = closer_mask.select(packet_t, min_t);
+            indices = closer_mask.select(sphere_simd.indices, indices);
+            index += 1;
         }
         let hit_mask = min_t.ne(TracePacketType::MAX);
         <[Option<HitRecord>; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
             let is_hit = hit_mask.extract(i);
-            let t = min_t.extract(i);
-            let index = indices.extract(i) as usize;
             if is_hit {
+                let t = min_t.extract(i);
+                let index = indices.extract(i) as usize;
                 let ray = packet.rays[i];
                 let point = ray.at(t);
                 let sphere = &self.objects_sphere[index];
@@ -120,6 +121,18 @@ impl Scene {
             } else {
                 None
             }
+        })
+    }
+
+    pub fn intersect_packet_simple(&self, packet: &RayPacket) -> [Option<HitRecord>; TRACE_PACKET_SIZE] {
+        <[Option<HitRecord>; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
+            let ray = packet.rays[i];
+            let query = RayQuery {
+                ray: ray,
+                t_min: TRACE_EPSILON,
+                t_max: TRACE_INFINITY,
+            };
+            self.intersect(query)
         })
     }
 }

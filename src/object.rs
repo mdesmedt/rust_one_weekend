@@ -101,6 +101,18 @@ pub struct SphereSimd {
 }
 
 impl SphereSimd {
+    pub fn from_sphere(sphere: &Sphere, index: u32) -> Self {
+        SphereSimd {
+            center_x: TracePacketType::splat(sphere.center.x),
+            center_y: TracePacketType::splat(sphere.center.y),
+            center_z: TracePacketType::splat(sphere.center.z),
+            radius: TracePacketType::splat(sphere.radius),
+            radius_rcp: TracePacketType::splat(sphere.radius_rcp),
+            radius_sq: TracePacketType::splat(sphere.radius_sq),
+            indices: TracePacketTypeIndex::splat(index),
+        }
+    }
+
     pub fn from_vec(spheres: Vec<Sphere>, indices: Vec<u32>) -> Self {
         SphereSimd {
             center_x: simd_from_fn(&spheres, |s| s.center.x),
@@ -114,6 +126,8 @@ impl SphereSimd {
     }
 
     pub fn intersect_packet(&self, packet: &RayPacket) -> TracePacketType {
+        let zero = TracePacketType::splat(0.0);
+
         let oc_x = packet.ray_origin_x - self.center_x;
         let oc_y = packet.ray_origin_y - self.center_y;
         let oc_z = packet.ray_origin_z - self.center_z;
@@ -128,17 +142,16 @@ impl SphereSimd {
         let c = oc_length_squared - self.radius_sq;
 
         let discriminant = half_b * half_b - a * c;
-        let discriminant_mask = discriminant.gt(TracePacketType::splat(0.0));
+        let discriminant_mask = discriminant.gt(zero);
 
         let sqrtd = discriminant.sqrt();
-        let root_a = (-half_b - sqrtd) / a;
-        let root_b = (-half_b + sqrtd) / a;
+        let root_a = ((zero-half_b) - sqrtd) / a;
+        let root_b = ((zero-half_b) + sqrtd) / a;
 
-        let root = root_a.min(root_b);
-
-        let root_mask_a = root_a.gt(packet.ray_t_min) & (root_a.lt(packet.ray_t_max));
-        let root_mask_b = root_b.gt(packet.ray_t_min) & (root_b.lt(packet.ray_t_max));
+        let root_mask_a = root_a.gt(packet.ray_t_min) & root_a.lt(packet.ray_t_max);
+        let root_mask_b = root_b.gt(packet.ray_t_min) & root_b.lt(packet.ray_t_max);
         let hit_mask = (root_mask_a | root_mask_b) & discriminant_mask;
+        let root = root_mask_a.select(root_a, root_b);
 
         let miss = TracePacketType::MAX;
 

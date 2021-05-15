@@ -211,6 +211,7 @@ impl RayPacket {
         self.ray_direction_x = self.ray_direction_x.replace(i, ray.direction.x);
         self.ray_direction_y = self.ray_direction_y.replace(i, ray.direction.y);
         self.ray_direction_z = self.ray_direction_z.replace(i, ray.direction.z);
+        self.direction_length_squared = self.direction_length_squared.replace(i, ray.direction_length_squared);
         self.rays[i] = ray;
     }
 
