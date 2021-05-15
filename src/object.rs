@@ -113,6 +113,30 @@ impl SphereSimd {
         }
     }
 
+    pub fn from_slice(spheres: &[Sphere], indices: &[u32]) -> Self {
+        SphereSimd {
+            center_x: simd_from_fn(&spheres, |s| s.center.x),
+            center_y: simd_from_fn(&spheres, |s| s.center.y),
+            center_z: simd_from_fn(&spheres, |s| s.center.z),
+            radius: simd_from_fn(&spheres, |s| s.radius),
+            radius_rcp: simd_from_fn(&spheres, |s| s.radius_rcp),
+            radius_sq: simd_from_fn(&spheres, |s| s.radius_sq),
+            indices: TracePacketTypeIndex::new(indices[0], indices[1], indices[2], indices[3]),
+        }
+    }
+
+    pub fn from_slice_option(spheres: &[Option<&Sphere>], indices: &[u32]) -> Self {
+        SphereSimd {
+            center_x: simd_from_fn(&spheres, |s| s.map_or(0.0, |q| q.center.x)),
+            center_y: simd_from_fn(&spheres, |s| s.map_or(0.0, |q| q.center.y)),
+            center_z: simd_from_fn(&spheres, |s| s.map_or(0.0, |q| q.center.z)),
+            radius: simd_from_fn(&spheres, |s| s.map_or(0.0, |q| q.radius)),
+            radius_rcp: simd_from_fn(&spheres, |s| s.map_or(0.0, |q| q.radius_rcp)),
+            radius_sq: simd_from_fn(&spheres, |s| s.map_or(0.0, |q| q.radius_sq)),
+            indices: TracePacketTypeIndex::new(indices[0], indices[1], indices[2], indices[3]),
+        }
+    }
+
     pub fn from_vec(spheres: Vec<Sphere>, indices: Vec<u32>) -> Self {
         SphereSimd {
             center_x: simd_from_fn(&spheres, |s| s.center.x),

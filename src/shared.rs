@@ -222,7 +222,7 @@ impl RayPacket {
     }
 }
 
-pub fn simd_from_fn<T>(v: &Vec<T>, f: fn(&T) -> f32) -> TracePacketType {
+pub fn simd_from_fn<T>(v: &[T], f: fn(&T) -> f32) -> TracePacketType {
     let mut vals: Vec<f32> = v.iter().map(f).collect();
     while vals.len() < TRACE_PACKET_SIZE {
         vals.push(0.0);

@@ -1,7 +1,7 @@
 use crate::object::*;
 use crate::shared::*;
 
-use bvh::bvh::BVH;
+use bvh::bvh::{BVH, BVHTraverseIterator};
 
 /// Basic scene which holds objects and a BVH
 pub struct Scene {
@@ -15,7 +15,7 @@ pub struct Scene {
     pub bounds: Vec<HittableBounds>,
 
     // Acceleration structure
-    pub bvh: Option<BVH>,
+    pub bvh: BVH,
 }
 
 impl Scene {
@@ -25,7 +25,7 @@ impl Scene {
             objects_sphere: Vec::new(),
             //simd_sphere: Vec::new(),
             bounds: Vec::new(),
-            bvh: None,
+            bvh: BVH { nodes: Vec::new() },
         }
     }
 
@@ -55,34 +55,32 @@ impl Scene {
             self.bounds.push(sphere.compute_bounds(i));
         }
         // Build BVH
-        self.bvh = Some(BVH::build(&mut self.bounds));
+        self.bvh = BVH::build(&mut self.bounds);
     }
 
     /// Return the closest intersection (or None) in the scene using the ray
     pub fn intersect(&self, mut query: RayQuery) -> Option<HitRecord> {
         let mut closest_hit_option: Option<HitRecord> = None;
 
-        if let Some(bvh) = &self.bvh {
-            // Traverse the BVH
-            let bvh_ray = bvh::ray::Ray::new(query.ray.origin, query.ray.direction);
-            let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
+        // Traverse the BVH
+        let bvh_ray = bvh::ray::Ray::new(query.ray.origin, query.ray.direction);
+        let hit_bounds = self.bvh.traverse_iterator(&bvh_ray, &self.bounds);
 
-            // Iterate over hit objects to find closest
-            for bounds in hit_bounds {
-                let obj = &self.objects_sphere[bounds.hittable_index];
-                let hit_option = obj.intersect(query);
-                if hit_option.is_some() {
-                    // Shorten the ray
-                    query.t_max = f32::min(query.t_max, hit_option.as_ref().unwrap().t);
-                }
-                if closest_hit_option.is_none() {
+        // Iterate over hit objects to find closest
+        for bounds in hit_bounds {
+            let obj = &self.objects_sphere[bounds.hittable_index];
+            let hit_option = obj.intersect(query);
+            if hit_option.is_some() {
+                // Shorten the ray
+                query.t_max = f32::min(query.t_max, hit_option.as_ref().unwrap().t);
+            }
+            if closest_hit_option.is_none() {
+                closest_hit_option = hit_option;
+            } else if hit_option.is_some() {
+                let closest_hit = closest_hit_option.as_ref().unwrap();
+                let hit = hit_option.as_ref().unwrap();
+                if hit.t < closest_hit.t {
                     closest_hit_option = hit_option;
-                } else if hit_option.is_some() {
-                    let closest_hit = closest_hit_option.as_ref().unwrap();
-                    let hit = hit_option.as_ref().unwrap();
-                    if hit.t < closest_hit.t {
-                        closest_hit_option = hit_option;
-                    }
                 }
             }
         }
@@ -90,11 +88,34 @@ impl Scene {
     }
 
     pub fn intersect_packet(&self, packet: &RayPacket) -> [Option<HitRecord>; TRACE_PACKET_SIZE] {
+        let bvh_rays = <[bvh::ray::Ray; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
+            let ray = packet.rays[i];
+            bvh::ray::Ray::new(ray.origin, ray.direction)
+        });
+        let mut iters = <[BVHTraverseIterator<HittableBounds>; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
+            self.bvh.traverse_iterator(&bvh_rays[i], &self.bounds)
+        });
         let mut min_t: TracePacketType = TracePacketType::MAX;
         let mut indices: TracePacketTypeIndex = TracePacketTypeIndex::splat(0);
         let mut index = 0;
-        for sphere in &self.objects_sphere {
-            let sphere_simd = SphereSimd::from_sphere(sphere, index);
+        loop {
+            let mut has_any = false;
+            let mut iter_indices: [u32; TRACE_PACKET_SIZE] = [0; TRACE_PACKET_SIZE];
+            let sphere_options = <[Option<&Sphere>; TRACE_PACKET_SIZE]>::init_with_indices(|i| {
+                match iters[i].next() {
+                    Some(bounds) => {
+                        has_any = true;
+                        iter_indices[i] = bounds.hittable_index as u32;
+                        Some(&self.objects_sphere[bounds.hittable_index])
+                    },
+                    None => None
+                }
+            });
+            if !has_any
+            {
+                break;
+            }
+            let sphere_simd = SphereSimd::from_slice_option(&sphere_options, &iter_indices);
             let packet_t = sphere_simd.intersect_packet(packet);
             let mask = packet_t.ne(TracePacketType::MAX) & packet_t.lt(min_t);
             min_t = mask.select(packet_t, min_t);
