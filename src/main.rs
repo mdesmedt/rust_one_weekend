@@ -120,7 +120,7 @@ fn main() {
     });
 
     // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    window.limit_update_rate(Some(std::time::Duration::from_micros(100000)));
 
     let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
 
@@ -158,8 +158,13 @@ fn main() {
             let ref render_results = render_worker.poll_results();
             let has_changed = render_results.len() > 0;
             for result in render_results {
-                let index = index_from_xy(WIDTH as u32, HEIGHT as u32, result.x, result.y);
-                buffer_display[index] = color_display_from_render(result.color);
+                for i in 0..result.pixels.len() {
+                    let color = result.pixels[i];
+                    let x = result.x + (i as u32 % result.width);
+                    let y = result.y + (i as u32 / result.width);
+                    let index = index_from_xy(WIDTH as u32, HEIGHT as u32, x, y);
+                    buffer_display[index] = color_display_from_render(color);
+                }
             }
 
             if has_changed {

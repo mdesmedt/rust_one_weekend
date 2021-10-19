@@ -9,12 +9,13 @@ use crate::scene::*;
 use crate::shared::*;
 
 /// Coordinates for a block to render
-#[derive(Copy, Clone)]
 pub struct RenderBlock {
+    pub block_index: u32,
     pub x: u32,
     pub y: u32,
     pub width: u32,
     pub height: u32,
+    pub pixels: Vec<Color>
 }
 
 /// Generates blocks of up to width,height for an image of width,height
@@ -63,24 +64,25 @@ impl Iterator for ImageBlocker {
         let x_end = std::cmp::min((block_x + 1) * self.block_width, self.image_width);
         let y_end = std::cmp::min((block_y + 1) * self.block_height, self.image_height);
 
-        let rb = RenderBlock {
+        let width = x_end - x;
+        let height = y_end - y;
+
+        let mut rb = RenderBlock {
+            block_index: self.block_index,
             x: x,
             y: y,
-            width: x_end - x,
-            height: y_end - y,
+            width: width,
+            height: height,
+            pixels: Vec::new(),
         };
+
+        // Allocate exactly enough space for pixels in the renderblock, to avoid allocation later in the renderer
+        rb.pixels.reserve_exact((width * height) as usize);
 
         self.block_index += 1;
 
         return Some(rb);
     }
-}
-
-/// A fully rendered pixel
-pub struct PixelResult {
-    pub x: u32,
-    pub y: u32,
-    pub color: Color,
 }
 
 /// Recursive ray tracing
@@ -121,8 +123,8 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color 
 pub struct Renderer {
     image_width: u32,
     image_height: u32,
-    channel_sender: crossbeam_channel::Sender<PixelResult>,
-    channel_receiver: crossbeam_channel::Receiver<PixelResult>,
+    channel_sender: crossbeam_channel::Sender<RenderBlock>,
+    channel_receiver: crossbeam_channel::Receiver<RenderBlock>,
     keep_rendering: AtomicCell<bool>,
     scene: Scene,
     camera: Camera,
@@ -160,22 +162,24 @@ impl Renderer {
         let blocker = ImageBlocker::new(self.image_width, self.image_height);
         let block_count_x = blocker.block_count_x as i32;
         let block_count_y = blocker.block_count_y as i32;
-        let blocks: Vec<RenderBlock> = blocker.collect();
+        let mut blocks: Vec<RenderBlock> = blocker.collect();
 
         // Set up ChebyshevIterator. A bit awkward because it is square and generates out of bound XY which we need to check.
         let radius = ((std::cmp::max(block_count_x, block_count_y) / 2) + 1) as u16;
         let center_x = block_count_x / 2 - 1;
         let center_y = block_count_y / 2 - 1;
-        let mut spiral_blocks = Vec::new();
 
+        let mut spiral_indices = Vec::new();
         // Loop blocks in spiral order using ChebyshevIterator
         for (block_x, block_y) in ChebyshevIterator::new(center_x, center_y, radius) {
             if block_x < 0 || block_x >= block_count_x || block_y < 0 || block_y >= block_count_y {
                 continue; // Block out of bounds, ignore.
             }
             let block_index = (block_y * block_count_x + block_x) as usize;
-            spiral_blocks.push(blocks[block_index])
+            spiral_indices.push(block_index as u32);
         }
+
+        blocks.sort_by_key(|rb| spiral_indices.iter().position(|&i| i == rb.block_index));
 
         let ref atomic_ray_count = AtomicCell::new(0u64);
 
@@ -183,7 +187,7 @@ impl Renderer {
 
         threadpool.scoped(|scoped| {
             // Loop blocks in the image blocker and spawn renderblock tasks
-            for renderblock in spiral_blocks {
+            for mut renderblock in blocks {
                 scoped.execute(move || {
                     // Begin of thread
                     let num_pixels = renderblock.width * renderblock.height;
@@ -215,16 +219,12 @@ impl Renderer {
                             }
                             color_accum /= self.samples_per_pixel as f32;
 
-                            // Send the result back
-                            let result = PixelResult {
-                                x: x,
-                                y: y,
-                                color: color_accum,
-                            };
-                            if self.keep_rendering.load() {
-                                self.channel_sender.send(result).unwrap();
-                            }
+                            renderblock.pixels.push(color_accum);
                         }); // for_each pixel
+
+                        if self.keep_rendering.load() {
+                            self.channel_sender.send(renderblock).unwrap();
+                        }
                     } // check keep_rendering
                     atomic_ray_count.fetch_add(ray_count as u64);
                     // End of thread
@@ -246,7 +246,7 @@ impl Renderer {
     }
 
     /// Returns fully rendered pixels in the channel
-    pub fn poll_results(&self) -> Vec<PixelResult> {
+    pub fn poll_results(&self) -> Vec<RenderBlock> {
         let mut results = Vec::new();
         let mut limit = self.image_width * self.image_height;
         while !self.channel_receiver.is_empty() {
