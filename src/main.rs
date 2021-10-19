@@ -189,7 +189,7 @@ fn main() {
 
         // Write buffer_display as 8-bit RGB PNG
         let mut encoder = png::Encoder::new(w, WIDTH as u32, HEIGHT as u32);
-        encoder.set_color(png::ColorType::RGB);
+        encoder.set_color(png::ColorType::Rgb);
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder.write_header().unwrap();
 
