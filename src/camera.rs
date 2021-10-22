@@ -36,12 +36,12 @@ impl Camera {
         let lower_left_corner = origin - horizontal / 2.0 - vertical / 2.0 - focus_dist * w;
 
         Camera {
-            origin: origin,
-            horizontal: horizontal,
-            vertical: vertical,
-            lower_left_corner: lower_left_corner,
-            u: u,
-            v: v,
+            origin,
+            horizontal,
+            vertical,
+            lower_left_corner,
+            u,
+            v,
             lens_radius: aperture / 2.0,
         }
     }
@@ -51,9 +51,9 @@ impl Camera {
         let rd = self.lens_radius * random_in_unit_disk();
         let offset = self.u * rd.x + self.v * rd.y;
 
-        return Ray::new(
+        Ray::new(
             self.origin + offset,
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
-        );
+        )
     }
 }

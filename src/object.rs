@@ -20,10 +20,10 @@ impl HitRecord {
         };
         HitRecord {
             point: ray.at(t),
-            normal: normal,
-            t: t,
-            front_face: front_face,
-            material: material,
+            normal,
+            t,
+            front_face,
+            material,
         }
     }
 }
@@ -38,7 +38,7 @@ pub struct HittableBounds {
 
 impl Bounded for HittableBounds {
     fn aabb(&self) -> AABB {
-        return self.aabb;
+        self.aabb
     }
 }
 
@@ -71,8 +71,8 @@ pub struct Sphere {
 impl Sphere {
     pub fn new(center: Point3, radius: f32, material: &Arc<dyn Material>) -> Self {
         Sphere {
-            center: center,
-            radius: radius,
+            center,
+            radius,
             material: material.clone(),
             radius_rcp: 1.0 / radius,
             radius_sq: radius * radius,
@@ -107,11 +107,10 @@ impl RayHittable for Sphere {
         let outward_normal = (point - self.center) * self.radius_rcp;
         let record = HitRecord::new(r, t, outward_normal, self.material.clone());
 
-        return Some(record);
+        Some(record)
     }
 
-    fn compute_bounds(&self, hittable_index: usize) -> HittableBounds
-    {
+    fn compute_bounds(&self, hittable_index: usize) -> HittableBounds {
         let half_size = Vec3::new(self.radius, self.radius, self.radius);
         let min = self.center - half_size;
         let max = self.center + half_size;
@@ -120,7 +119,7 @@ impl RayHittable for Sphere {
         HittableBounds {
             aabb,
             node_index: 0,
-            hittable_index: hittable_index
+            hittable_index,
         }
     }
 }

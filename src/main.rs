@@ -5,10 +5,10 @@ mod render;
 mod scene;
 mod shared;
 
+use rand::SeedableRng;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use rand::SeedableRng;
 
 use camera::*;
 use material::*;
@@ -82,17 +82,13 @@ fn one_weekend_scene() -> Scene {
                 if choose_mat < 0.7 {
                     // diffuse
                     let albedo = color_random(&mut rng);
-                    let sphere_material: Arc<dyn Material> =
-                        Arc::new(Lambertian { albedo: albedo });
+                    let sphere_material: Arc<dyn Material> = Arc::new(Lambertian { albedo });
                     add_sphere(&mut spheres, center, 0.2, &sphere_material);
                 } else if choose_mat < 0.95 {
                     // metal
                     let albedo = color_random_range(&mut rng, 0.5, 1.0);
                     let fuzz = rng.gen_range(0.0..0.5);
-                    let sphere_material: Arc<dyn Material> = Arc::new(Metal {
-                        albedo: albedo,
-                        fuzz: fuzz,
-                    });
+                    let sphere_material: Arc<dyn Material> = Arc::new(Metal { albedo, fuzz });
                     add_sphere(&mut spheres, center, 0.2, &sphere_material);
                 } else {
                     // glass
@@ -103,7 +99,7 @@ fn one_weekend_scene() -> Scene {
         }
     }
 
-    return scene;
+    scene
 }
 
 fn main() {
@@ -155,8 +151,8 @@ fn main() {
         // Window loop
         while window.is_open() && !window.is_key_down(Key::Escape) {
             // Fetch rendered pixels
-            let ref render_results = render_worker.poll_results();
-            let has_changed = render_results.len() > 0;
+            let render_results = &render_worker.poll_results();
+            let has_changed = !render_results.is_empty();
             for result in render_results {
                 for i in 0..result.pixels.len() {
                     let color = result.pixels[i];
@@ -185,7 +181,7 @@ fn main() {
     if args.len() > 1 {
         let path = Path::new(&args[1]);
         let file = File::create(path).unwrap();
-        let ref mut w = BufWriter::new(file);
+        let w = &mut BufWriter::new(file);
 
         // Write buffer_display as 8-bit RGB PNG
         let mut encoder = png::Encoder::new(w, WIDTH as u32, HEIGHT as u32);

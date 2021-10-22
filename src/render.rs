@@ -15,7 +15,7 @@ pub struct RenderBlock {
     pub y: u32,
     pub width: u32,
     pub height: u32,
-    pub pixels: Vec<Color>
+    pub pixels: Vec<Color>,
 }
 
 /// Generates blocks of up to width,height for an image of width,height
@@ -34,10 +34,10 @@ impl ImageBlocker {
         let block_width = 32;
         let block_height = 32;
         ImageBlocker {
-            image_width: image_width,
-            image_height: image_height,
-            block_width: block_width,
-            block_height: block_height,
+            image_width,
+            image_height,
+            block_width,
+            block_height,
             block_count_x: ceil_div(image_width, block_width),
             block_count_y: ceil_div(image_height, block_height),
             block_index: 0,
@@ -69,10 +69,10 @@ impl Iterator for ImageBlocker {
 
         let mut rb = RenderBlock {
             block_index: self.block_index,
-            x: x,
-            y: y,
-            width: width,
-            height: height,
+            x,
+            y,
+            width,
+            height,
             pixels: Vec::new(),
         };
 
@@ -81,7 +81,7 @@ impl Iterator for ImageBlocker {
 
         self.block_index += 1;
 
-        return Some(rb);
+        Some(rb)
     }
 }
 
@@ -93,7 +93,7 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color 
 
     // Intersect scene
     let query = RayQuery {
-        ray: ray,
+        ray,
         t_min: TRACE_EPSILON,
         t_max: TRACE_INFINITY,
     };
@@ -116,7 +116,7 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color 
     // Background
     let unit_direction = ray.direction.normalize();
     let t = 0.5 * (unit_direction.y + 1.0);
-    return (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0);
+    (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
 }
 
 /// Renderer which generates pixels using the scene and camera, and sends them back using a crossbeam channel
@@ -142,14 +142,14 @@ impl Renderer {
     ) -> Self {
         let (s, r) = bounded(image_width as usize * image_height as usize);
         Renderer {
-            image_width: image_width,
-            image_height: image_height,
+            image_width,
+            image_height,
             channel_sender: s,
             channel_receiver: r,
             keep_rendering: AtomicCell::new(true),
-            scene: scene,
-            camera: camera,
-            samples_per_pixel: samples_per_pixel,
+            scene,
+            camera,
+            samples_per_pixel,
             max_depth: 50,
         }
     }
@@ -181,7 +181,7 @@ impl Renderer {
 
         blocks.sort_by_key(|rb| spiral_indices.iter().position(|&i| i == rb.block_index));
 
-        let ref atomic_ray_count = AtomicCell::new(0u64);
+        let atomic_ray_count = &AtomicCell::new(0u64);
 
         let mut threadpool = Pool::new(num_cpus::get() as u32);
 

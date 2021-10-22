@@ -75,10 +75,10 @@ impl Material for Dielectric {
             direction = vec_refract(unit_direction, hit.normal, refraction_ratio);
         }
 
-        let scattered = Ray::new(hit.point, direction);
+        let scattered_ray = Ray::new(hit.point, direction);
         Some(ScatterResult {
-            attenuation: attenuation,
-            scattered_ray: scattered,
+            attenuation,
+            scattered_ray,
         })
     }
 }

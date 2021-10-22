@@ -44,7 +44,7 @@ pub fn u8_vec_from_color_display(c: ColorDisplay) -> Vec<u8> {
     let b = c as u8;
     let g = (c >> 8) as u8;
     let r = (c >> 16) as u8;
-    return vec![r, g, b];
+    vec![r, g, b]
 }
 
 pub fn color_display_from_u8_rgb(r: u8, g: u8, b: u8) -> ColorDisplay {
@@ -63,21 +63,21 @@ pub fn color_display_from_render(c: Color) -> ColorDisplay {
 }
 
 pub fn degrees_to_radians(degrees: f32) -> f32 {
-    return degrees * std::f32::consts::PI / 180.0;
+    degrees * std::f32::consts::PI / 180.0
 }
 
 pub fn vec3_random_range(min: f32, max: f32) -> Vec3 {
     let mut rng = rand::thread_rng();
-    return Vec3::new(
+    Vec3::new(
         rng.gen_range(min..max),
         rng.gen_range(min..max),
         rng.gen_range(min..max),
-    );
+    )
 }
 
 #[allow(dead_code)]
 pub fn vec3_random() -> Vec3 {
-    return vec3_random_range(0.0, 1.0);
+    vec3_random_range(0.0, 1.0)
 }
 
 pub fn random_in_unit_sphere() -> Vec3 {
@@ -90,16 +90,16 @@ pub fn random_in_unit_sphere() -> Vec3 {
 }
 
 pub fn random_unit_vector() -> Vec3 {
-    return random_in_unit_sphere().normalize();
+    random_in_unit_sphere().normalize()
 }
 
 #[allow(dead_code)]
 pub fn random_in_hemisphere(normal: Vec3) -> Vec3 {
     let in_unit_sphere = random_in_unit_sphere();
     if in_unit_sphere.dot(normal) > 0.0 {
-        return in_unit_sphere; // In the same hemisphere as the normal
+        in_unit_sphere // In the same hemisphere as the normal
     } else {
-        return -in_unit_sphere;
+        -in_unit_sphere
     }
 }
 
@@ -124,14 +124,14 @@ pub fn vec_refract(uv: Vec3, n: Vec3, etai_over_etat: f32) -> Vec3 {
     let cos_theta = f32::min((-uv).dot(n), 1.0);
     let r_out_perp = etai_over_etat * (uv + cos_theta * n);
     let r_out_parallel = -f32::sqrt(f32::abs(1.0 - r_out_perp.length_squared())) * n;
-    return r_out_perp + r_out_parallel;
+    r_out_perp + r_out_parallel
 }
 
 pub fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
     // Use Schlick's approximation for reflectance.
     let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
     r0 = r0 * r0;
-    return r0 + (1.0 - r0) * ((1.0 - cosine).powf(5.0));
+    r0 + (1.0 - r0) * ((1.0 - cosine).powf(5.0))
 }
 
 pub fn ceil_div(x: u32, y: u32) -> u32 {
@@ -153,9 +153,9 @@ pub fn color_random<T: Rng>(rng: &mut T) -> Color {
 }
 
 pub fn color_random_range<T: Rng>(rng: &mut T, min: f32, max: f32) -> Color {
-    return Color::new(
+    Color::new(
         rng.gen_range(min..max),
         rng.gen_range(min..max),
         rng.gen_range(min..max),
-    );
+    )
 }

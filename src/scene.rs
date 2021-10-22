@@ -39,10 +39,7 @@ impl Scene {
 
         if let Some(bvh) = &self.bvh {
             // Traverse the BVH
-            let bvh_ray = bvh::ray::Ray::new(
-                query.ray.origin,
-                query.ray.direction,
-            );
+            let bvh_ray = bvh::ray::Ray::new(query.ray.origin, query.ray.direction);
             let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
 
             // Iterate over hit objects to find closest
@@ -64,6 +61,6 @@ impl Scene {
                 }
             }
         }
-        return closest_hit_option;
+        closest_hit_option
     }
 }
