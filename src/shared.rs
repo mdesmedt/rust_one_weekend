@@ -1,7 +1,9 @@
 pub use bvh::aabb::{Bounded, AABB};
 pub use bvh::bounding_hierarchy::{BHShape, BoundingHierarchy};
 pub use glam::Vec3;
-pub use rand::Rng;
+use rand::Rng;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro128Plus;
 pub use std::sync::Arc;
 
 pub type Point3 = glam::Vec3;
@@ -66,36 +68,51 @@ pub fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * std::f32::consts::PI / 180.0
 }
 
-pub fn vec3_random_range(min: f32, max: f32) -> Vec3 {
-    let mut rng = rand::thread_rng();
+pub struct RayRng {
+    rng: Xoshiro128Plus,
+}
+
+impl RayRng {
+    pub fn new(seed: u64) -> RayRng {
+        RayRng {
+            rng: Xoshiro128Plus::seed_from_u64(seed),
+        }
+    }
+
+    pub fn gen_range(&mut self, range: std::ops::Range<f32>) -> f32 {
+        self.rng.gen_range(range)
+    }
+}
+
+pub fn vec3_random_range(rng: &mut RayRng, range: std::ops::Range<f32>) -> Vec3 {
     Vec3::new(
-        rng.gen_range(min..max),
-        rng.gen_range(min..max),
-        rng.gen_range(min..max),
+        rng.gen_range(range.clone()),
+        rng.gen_range(range.clone()),
+        rng.gen_range(range),
     )
 }
 
 #[allow(dead_code)]
-pub fn vec3_random() -> Vec3 {
-    vec3_random_range(0.0, 1.0)
+pub fn vec3_random(rng: &mut RayRng) -> Vec3 {
+    vec3_random_range(rng, 0.0..1.0)
 }
 
-pub fn random_in_unit_sphere() -> Vec3 {
+pub fn random_in_unit_sphere(rng: &mut RayRng) -> Vec3 {
     loop {
-        let p = vec3_random_range(-1.0, 1.0);
+        let p = vec3_random_range(rng, -1.0..1.0);
         if p.length_squared() < 1.0 {
             return p;
         }
     }
 }
 
-pub fn random_unit_vector() -> Vec3 {
-    random_in_unit_sphere().normalize()
+pub fn random_unit_vector(rng: &mut RayRng) -> Vec3 {
+    random_in_unit_sphere(rng).normalize()
 }
 
 #[allow(dead_code)]
-pub fn random_in_hemisphere(normal: Vec3) -> Vec3 {
-    let in_unit_sphere = random_in_unit_sphere();
+pub fn random_in_hemisphere(rng: &mut RayRng, normal: Vec3) -> Vec3 {
+    let in_unit_sphere = random_in_unit_sphere(rng);
     if in_unit_sphere.dot(normal) > 0.0 {
         in_unit_sphere // In the same hemisphere as the normal
     } else {
@@ -138,8 +155,7 @@ pub fn ceil_div(x: u32, y: u32) -> u32 {
     (x + y - 1) / y
 }
 
-pub fn random_in_unit_disk() -> Vec3 {
-    let mut rng = rand::thread_rng();
+pub fn random_in_unit_disk(rng: &mut RayRng) -> Vec3 {
     loop {
         let p = Vec3::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0), 0.0);
         if p.length_squared() < 1.0 {
@@ -148,14 +164,14 @@ pub fn random_in_unit_disk() -> Vec3 {
     }
 }
 
-pub fn color_random<T: Rng>(rng: &mut T) -> Color {
-    color_random_range(rng, 0.0, 1.0)
+pub fn color_random(rng: &mut RayRng) -> Color {
+    color_random_range(rng, 0.0..1.0)
 }
 
-pub fn color_random_range<T: Rng>(rng: &mut T, min: f32, max: f32) -> Color {
+pub fn color_random_range(rng: &mut RayRng, range: std::ops::Range<f32>) -> Color {
     Color::new(
-        rng.gen_range(min..max),
-        rng.gen_range(min..max),
-        rng.gen_range(min..max),
+        rng.gen_range(range.clone()),
+        rng.gen_range(range.clone()),
+        rng.gen_range(range),
     )
 }

@@ -9,7 +9,7 @@ pub struct ScatterResult {
 
 /// A material which can scatter rays
 pub trait Material: Send + Sync {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
+    fn scatter(&self, rng: &mut RayRng, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
 }
 
 pub struct Lambertian {
@@ -17,8 +17,8 @@ pub struct Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let mut scatter_direction = hit.normal + random_unit_vector();
+    fn scatter(&self, rng: &mut RayRng, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+        let mut scatter_direction = hit.normal + random_unit_vector(rng);
         if scatter_direction.near_zero() {
             scatter_direction = hit.normal;
         }
@@ -37,10 +37,13 @@ pub struct Metal {
 }
 
 impl Material for Metal {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+    fn scatter(&self, rng: &mut RayRng, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
         let reflected = vec_reflect(ray.direction.normalize(), hit.normal);
 
-        let scattered = Ray::new(hit.point, reflected + self.fuzz * random_in_unit_sphere());
+        let scattered = Ray::new(
+            hit.point,
+            reflected + self.fuzz * random_in_unit_sphere(rng),
+        );
         Some(ScatterResult {
             attenuation: self.albedo,
             scattered_ray: scattered,
@@ -53,9 +56,7 @@ pub struct Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let mut rng = rand::thread_rng();
-
+    fn scatter(&self, rng: &mut RayRng, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
         let attenuation = Color::new(1.0, 1.0, 1.0);
         let refraction_ratio = if hit.front_face {
             1.0 / self.ir

@@ -5,7 +5,6 @@ mod render;
 mod scene;
 mod shared;
 
-use rand::SeedableRng;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -18,13 +17,13 @@ use shared::*;
 
 use minifb::{Key, Window, WindowOptions};
 
-const WIDTH: usize = 1920;
-const HEIGHT: usize = 1080;
-const SAMPLES_PER_PIXEL: u32 = 256;
+const WIDTH: usize = 1280;
+const HEIGHT: usize = 720;
+const SAMPLES_PER_PIXEL: u32 = 8;
 
 /// Generate the ray tracing in one weekend scene
 fn one_weekend_scene() -> Scene {
-    let mut rng = rand_pcg::Pcg32::seed_from_u64(2);
+    let mut rng = RayRng::new(0);
     let mut scene = Scene::new();
 
     let mut spheres: Vec<(Point3, f32)> = Vec::new();
@@ -86,7 +85,7 @@ fn one_weekend_scene() -> Scene {
                     add_sphere(&mut spheres, center, 0.2, &sphere_material);
                 } else if choose_mat < 0.95 {
                     // metal
-                    let albedo = color_random_range(&mut rng, 0.5, 1.0);
+                    let albedo = color_random_range(&mut rng, 0.5..1.0);
                     let fuzz = rng.gen_range(0.0..0.5);
                     let sphere_material: Arc<dyn Material> = Arc::new(Metal { albedo, fuzz });
                     add_sphere(&mut spheres, center, 0.2, &sphere_material);

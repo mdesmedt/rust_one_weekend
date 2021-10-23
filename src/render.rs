@@ -86,7 +86,7 @@ impl Iterator for ImageBlocker {
 }
 
 /// Recursive ray tracing
-fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
+fn ray_color(rng: &mut RayRng, ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
     if depth <= 0 {
         return Color::ZERO;
     }
@@ -102,12 +102,12 @@ fn ray_color(ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color 
 
     // If we hit something
     if let Some(hit) = hit_option {
-        let scatter_option = hit.material.scatter(&ray, &hit);
+        let scatter_option = hit.material.scatter(rng, &ray, &hit);
 
         // Recurse
         if let Some(scatter) = scatter_option {
             return scatter.attenuation
-                * ray_color(scatter.scattered_ray, scene, depth - 1, ray_count);
+                * ray_color(rng, scatter.scattered_ray, scene, depth - 1, ray_count);
         }
 
         return Color::ZERO;
@@ -192,7 +192,8 @@ impl Renderer {
                     // Begin of thread
                     let num_pixels = renderblock.width * renderblock.height;
                     let mut ray_count = 0;
-                    let mut rng = rand::thread_rng();
+                    // Initialize RNG using block_index as seed
+                    let mut rng = RayRng::new(renderblock.block_index as u64);
                     if self.keep_rendering.load() {
                         (0..num_pixels).into_iter().for_each(|index| {
                             // Compute pixel location
@@ -212,10 +213,15 @@ impl Renderer {
                             for _ in 0..self.samples_per_pixel {
                                 let u = u_base + rng.gen_range(0.0..u_rand);
                                 let v = v_base + rng.gen_range(0.0..v_rand);
-                                let ray = self.camera.get_ray(u, v);
+                                let ray = self.camera.get_ray(&mut rng, u, v);
                                 // Start the primary here from here
-                                color_accum +=
-                                    ray_color(ray, &self.scene, self.max_depth, &mut ray_count);
+                                color_accum += ray_color(
+                                    &mut rng,
+                                    ray,
+                                    &self.scene,
+                                    self.max_depth,
+                                    &mut ray_count,
+                                );
                             }
                             color_accum /= self.samples_per_pixel as f32;
 

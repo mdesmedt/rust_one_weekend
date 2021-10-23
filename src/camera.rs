@@ -47,8 +47,8 @@ impl Camera {
     }
 
     /// Generate a ray using the lens model
-    pub fn get_ray(&self, s: f32, t: f32) -> Ray {
-        let rd = self.lens_radius * random_in_unit_disk();
+    pub fn get_ray(&self, rng: &mut RayRng, s: f32, t: f32) -> Ray {
+        let rd = self.lens_radius * random_in_unit_disk(rng);
         let offset = self.u * rd.x + self.v * rd.y;
 
         Ray::new(
