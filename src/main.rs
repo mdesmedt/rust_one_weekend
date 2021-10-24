@@ -222,3 +222,24 @@ fn main() {
         writer.write_image_data(&data).unwrap();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests if two renders produce exactly the same image
+    #[test]
+    fn test_determnism() {
+        let mut render_buffer_a = RenderBuffer::new(100, 100, 8);
+        render_buffer_a.render_worker.render_frame();
+        render_buffer_a.update_buffer();
+        let mut render_buffer_b = RenderBuffer::new(100, 100, 8);
+        render_buffer_b.render_worker.render_frame();
+        render_buffer_b.update_buffer();
+        for i in 0..render_buffer_a.buffer_display.len() {
+            let a = render_buffer_a.buffer_display[i];
+            let b = render_buffer_a.buffer_display[i];
+            assert_eq!(a, b);
+        }
+    }
+}
