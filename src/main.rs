@@ -101,9 +101,67 @@ fn one_weekend_scene() -> Scene {
     scene
 }
 
-fn main() {
-    let mut buffer_display: Vec<ColorDisplay> = vec![0; WIDTH * HEIGHT];
+struct RenderBuffer {
+    buffer_display: Vec<ColorDisplay>,
+    render_worker: Arc<render::Renderer>,
+    width: usize,
+    height: usize,
+}
 
+impl RenderBuffer {
+    pub fn new(width: usize, height: usize, samples_per_pixel: u32) -> RenderBuffer {
+        let buffer_display: Vec<ColorDisplay> = vec![0; width * height];
+
+        let mut scene = one_weekend_scene();
+        scene.build_bvh();
+
+        let aspect_ratio = (width as f32) / (height as f32);
+
+        let lookfrom = Point3::new(13.0, 2.0, 3.0);
+        let lookat = Point3::new(0.0, 0.0, 0.0);
+        let vup = Vec3::new(0.0, 1.0, 0.0);
+        let dist_to_focus = 10.0;
+        let aperture = 0.1;
+
+        let cam = Camera::new(
+            lookfrom,
+            lookat,
+            vup,
+            20.0,
+            aspect_ratio,
+            aperture,
+            dist_to_focus,
+        );
+
+        let render_worker =
+            render::Renderer::new(width as u32, height as u32, samples_per_pixel, scene, cam);
+
+        RenderBuffer {
+            buffer_display,
+            render_worker: Arc::new(render_worker),
+            width,
+            height,
+        }
+    }
+
+    pub fn update_buffer(&mut self) -> bool {
+        // Fetch rendered pixels
+        let render_results = &self.render_worker.poll_results();
+        let has_changed = !render_results.is_empty();
+        for result in render_results {
+            for i in 0..result.pixels.len() {
+                let color = result.pixels[i];
+                let x = result.x + (i as u32 % result.width);
+                let y = result.y + (i as u32 / result.width);
+                let index = index_from_xy(self.width as u32, self.height as u32, x, y);
+                self.buffer_display[index] = color_display_from_render(color);
+            }
+        }
+        has_changed
+    }
+}
+
+fn main() {
     let mut window = Window::new(
         "Ray tracing in one weekend - ESC to exit",
         WIDTH,
@@ -117,61 +175,29 @@ fn main() {
     // Limit to max ~60 fps update rate
     window.limit_update_rate(Some(std::time::Duration::from_micros(100000)));
 
-    let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
-
-    let lookfrom = Point3::new(13.0, 2.0, 3.0);
-    let lookat = Point3::new(0.0, 0.0, 0.0);
-    let vup = Vec3::new(0.0, 1.0, 0.0);
-    let dist_to_focus = 10.0;
-    let aperture = 0.1;
-
-    let cam = Camera::new(
-        lookfrom,
-        lookat,
-        vup,
-        20.0,
-        aspect_ratio,
-        aperture,
-        dist_to_focus,
-    );
-
-    let mut scene = one_weekend_scene();
-    scene.build_bvh();
-
-    let render_worker =
-        render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);
+    // Create render buffer which holds all useful structs for rendering
+    let mut render_buffer = RenderBuffer::new(WIDTH, HEIGHT, SAMPLES_PER_PIXEL);
 
     crossbeam::scope(|s| {
         // Start the render thread
-        s.spawn(|_| {
+        let render_worker = render_buffer.render_worker.clone();
+        s.spawn(move |_| {
             render_worker.render_frame();
         });
 
         // Window loop
         while window.is_open() && !window.is_key_down(Key::Escape) {
-            // Fetch rendered pixels
-            let render_results = &render_worker.poll_results();
-            let has_changed = !render_results.is_empty();
-            for result in render_results {
-                for i in 0..result.pixels.len() {
-                    let color = result.pixels[i];
-                    let x = result.x + (i as u32 % result.width);
-                    let y = result.y + (i as u32 / result.width);
-                    let index = index_from_xy(WIDTH as u32, HEIGHT as u32, x, y);
-                    buffer_display[index] = color_display_from_render(color);
-                }
-            }
-
+            let has_changed = render_buffer.update_buffer();
             if has_changed {
                 window
-                    .update_with_buffer(&buffer_display, WIDTH, HEIGHT)
+                    .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
                     .unwrap();
             } else {
                 window.update();
             }
         }
 
-        render_worker.stop_render();
+        render_buffer.render_worker.stop_render();
     })
     .unwrap();
 
@@ -188,7 +214,8 @@ fn main() {
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder.write_header().unwrap();
 
-        let data: Vec<u8> = buffer_display
+        let data: Vec<u8> = render_buffer
+            .buffer_display
             .iter()
             .flat_map(|x| u8_vec_from_color_display(*x))
             .collect();
