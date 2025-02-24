@@ -159,12 +159,16 @@ fn main() {
 
     // Kick off renderer
     thread::spawn(move || {
+        println!("Start render");
         let time_start = std::time::Instant::now();
         let atomic_ray_count = AtomicU64::new(0);
         let atomic_line = AtomicU32::new(0);
-        (0..HEIGHT).into_par_iter().for_each(|line| {
+
+        (0..HEIGHT).into_par_iter().for_each(|_| {
             let line = atomic_line.fetch_add(1, Ordering::Relaxed);
-            let mut packet = BufferPacket { pixels: Vec::new() };
+            let mut packet = BufferPacket {
+                pixels: Vec::with_capacity(WIDTH),
+            };
             let mut rng = RayRng::new(line as u64);
             for x in 0..WIDTH as u32 {
                 let mut ray_count: u32 = 0;
@@ -176,6 +180,7 @@ fn main() {
             }
             channel_send.send(packet).unwrap();
         });
+
         let time_elapsed = time_start.elapsed();
         let ray_count = atomic_ray_count.load(Ordering::Acquire);
         let ray_count_f32 = ray_count as f32;
