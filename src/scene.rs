@@ -45,21 +45,24 @@ impl Scene {
             let bvh_ray = bvh::ray::Ray::new(origin, direction);
             let nearest = bvh.nearest_traverse_iterator(&bvh_ray, &self.bounds);
 
-            // Iterate over hit objects to find closest
+            // Iterate over bvh-intersected objects to find closest
             for bounds in nearest {
                 let obj = self.objects[bounds.hittable_index].as_ref();
                 let hit_option = obj.intersect(query);
                 if hit_option.is_some() {
                     // Shorten the ray
-                    query.t_max = f32::min(query.t_max, hit_option.as_ref().unwrap().t);
-                }
-                if closest_hit_option.is_none() {
-                    closest_hit_option = hit_option;
-                } else if hit_option.is_some() {
-                    let closest_hit = closest_hit_option.as_ref().unwrap();
                     let hit = hit_option.as_ref().unwrap();
-                    if hit.t < closest_hit.t {
+                    query.t_max = f32::min(query.t_max, hit.t);
+
+                    if closest_hit_option.is_none() {
+                        // First hit along the ray
                         closest_hit_option = hit_option;
+                    } else {
+                        let closest_hit = closest_hit_option.as_ref().unwrap();
+                        if hit.t < closest_hit.t {
+                            // Found new closest hit
+                            closest_hit_option = hit_option;
+                        }
                     }
                 }
             }
