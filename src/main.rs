@@ -8,7 +8,7 @@ mod shared;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::thread;
 
 use camera::*;
@@ -106,7 +106,7 @@ fn one_weekend_scene() -> Scene {
 }
 
 struct BufferPacket {
-    pixels: Vec<(usize, usize, ColorDisplay)>,
+    pixels: Vec<(u32, u32, ColorDisplay)>,
 }
 
 fn main() {
@@ -161,12 +161,14 @@ fn main() {
     thread::spawn(move || {
         let time_start = std::time::Instant::now();
         let atomic_ray_count = AtomicU64::new(0);
+        let atomic_line = AtomicU32::new(0);
         (0..HEIGHT).into_par_iter().for_each(|line| {
+            let line = atomic_line.fetch_add(1, Ordering::Relaxed);
             let mut packet = BufferPacket { pixels: Vec::new() };
             let mut rng = RayRng::new(line as u64);
-            for x in 0..WIDTH {
+            for x in 0..WIDTH as u32 {
                 let mut ray_count: u32 = 0;
-                let col = render_worker.render_pixel(x as u32, line as u32, &mut rng, &mut ray_count);
+                let col = render_worker.render_pixel(x, line, &mut rng, &mut ray_count);
                 atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
                 packet
                     .pixels
@@ -192,7 +194,7 @@ fn main() {
         {
             for packet in channel_receive.try_iter() {
                 for pixel in packet.pixels {
-                    let index = pixel.0 + pixel.1 * WIDTH;
+                    let index = pixel.0 as usize + pixel.1 as usize * WIDTH;
                     buffer_display[index] = pixel.2;
                 }
             }
