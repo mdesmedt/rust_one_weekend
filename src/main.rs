@@ -5,6 +5,7 @@ mod render;
 mod scene;
 mod shared;
 
+use std::thread;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -16,7 +17,7 @@ use scene::*;
 use shared::*;
 
 use rayon::prelude::*;
-
+use crossbeam_channel::unbounded;
 use minifb::{Key, Window, WindowOptions};
 
 const WIDTH: usize = 1280;
@@ -121,6 +122,10 @@ impl RenderBuffer {
     }
 }
 
+struct BufferPacket {
+    pixels: Vec<(usize, usize, ColorDisplay)>
+}
+
 fn main() {
     let mut window = Window::new(
         "Ray tracing in one weekend - ESC to exit",
@@ -133,18 +138,10 @@ fn main() {
     });
 
     // Limit to max ~10 fps update rate
-    window.set_target_fps(10);
+    window.set_target_fps(30);
 
     // Create render buffer which holds all useful structs for rendering
     let mut render_buffer = RenderBuffer::new(WIDTH, HEIGHT, SAMPLES_PER_PIXEL);
-    for y in 0..HEIGHT as u32 {
-        for x in 0..WIDTH as u32 {
-            let index = index_from_xy(WIDTH as u32, HEIGHT as u32, x, y);
-            let color =
-                color_display_from_f32_rgb(x as f32 / WIDTH as f32, y as f32 / HEIGHT as f32, 0.0);
-            render_buffer.buffer_display[index] = color;
-        }
-    }
 
     // Create teh scene
     let mut scene = one_weekend_scene();
@@ -174,25 +171,42 @@ fn main() {
     let render_worker =
         render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);
 
-    let mut line: usize = 0;
+    // Create channels
+    let (channel_send, channel_receive) = unbounded();
+
+    // Kick off renderer
+    thread::spawn(move || {
+        for line in 0..HEIGHT {
+            let mut packet= BufferPacket {
+                pixels: Vec::new()
+            };
+            let start = line * WIDTH;
+            let end = start + WIDTH;
+            (start..end)
+                .into_par_iter()
+                .map(|index| {
+                    let x = index % WIDTH;
+                    let y = index / WIDTH;
+                    let col = render_worker.render_pixel(x as u32, y as u32);
+                    (x, y, color_display_from_render(col))
+                }).collect_into_vec(&mut packet.pixels);
+            channel_send.send(packet).unwrap();
+        }
+    });
 
     // Window loop
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if line < HEIGHT {
-            let start = line * WIDTH;
-            let end = start + WIDTH;
-            render_buffer.buffer_display[start..end]
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(x, col)| {
-                    *col =
-                        color_display_from_render(render_worker.render_pixel(x as u32, line as u32));
-                });
-        }
-        line += 1;
-        window
+        {
+            for packet in channel_receive.try_iter() {
+                for pixel in packet.pixels {
+                    let index = pixel.0 + pixel.1 * WIDTH;
+                    render_buffer.buffer_display[index] = pixel.2;
+                }
+            }
+            window
             .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
             .unwrap();
+        }
     }
 
     // If we get one argument, assume it's our output png filename
