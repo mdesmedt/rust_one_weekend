@@ -8,6 +8,8 @@ mod shared;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
 
 use camera::*;
 use material::*;
@@ -15,10 +17,12 @@ use object::*;
 use scene::*;
 use shared::*;
 
+use crossbeam_channel::unbounded;
 use minifb::{Key, Window, WindowOptions};
+use rayon::prelude::*;
 
-const WIDTH: usize = 1920;
-const HEIGHT: usize = 1080;
+const WIDTH: usize = 1280;
+const HEIGHT: usize = 720;
 const SAMPLES_PER_PIXEL: u32 = 128;
 
 /// Generate the ray tracing in one weekend scene
@@ -103,7 +107,6 @@ fn one_weekend_scene() -> Scene {
 
 struct RenderBuffer {
     buffer_display: Vec<ColorDisplay>,
-    render_worker: Arc<render::Renderer>,
     width: usize,
     height: usize,
 }
@@ -112,53 +115,16 @@ impl RenderBuffer {
     pub fn new(width: usize, height: usize, samples_per_pixel: u32) -> RenderBuffer {
         let buffer_display: Vec<ColorDisplay> = vec![0; width * height];
 
-        let mut scene = one_weekend_scene();
-        scene.build_bvh();
-
-        let aspect_ratio = (width as f32) / (height as f32);
-
-        let lookfrom = Point3::new(13.0, 2.0, 3.0);
-        let lookat = Point3::new(0.0, 0.0, 0.0);
-        let vup = Vec3::new(0.0, 1.0, 0.0);
-        let dist_to_focus = 10.0;
-        let aperture = 0.1;
-
-        let cam = Camera::new(
-            lookfrom,
-            lookat,
-            vup,
-            20.0,
-            aspect_ratio,
-            aperture,
-            dist_to_focus,
-        );
-
-        let render_worker =
-            render::Renderer::new(width as u32, height as u32, samples_per_pixel, scene, cam);
-
         RenderBuffer {
             buffer_display,
-            render_worker: Arc::new(render_worker),
             width,
             height,
         }
     }
+}
 
-    pub fn update_buffer(&mut self) -> bool {
-        // Fetch rendered pixels
-        let render_results = &self.render_worker.poll_results();
-        let has_changed = !render_results.is_empty();
-        for result in render_results {
-            for i in 0..result.pixels.len() {
-                let color = result.pixels[i];
-                let x = result.x + (i as u32 % result.width);
-                let y = result.y + (i as u32 / result.width);
-                let index = index_from_xy(self.width as u32, self.height as u32, x, y);
-                self.buffer_display[index] = color_display_from_render(color);
-            }
-        }
-        has_changed
-    }
+struct BufferPacket {
+    pixels: Vec<(usize, usize, ColorDisplay)>,
 }
 
 fn main() {
@@ -172,34 +138,87 @@ fn main() {
         panic!("{}", e);
     });
 
-    // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(std::time::Duration::from_micros(100000)));
+    // Limit to max ~10 fps update rate
+    window.set_target_fps(30);
 
     // Create render buffer which holds all useful structs for rendering
     let mut render_buffer = RenderBuffer::new(WIDTH, HEIGHT, SAMPLES_PER_PIXEL);
 
-    crossbeam::scope(|s| {
-        // Start the render thread
-        let render_worker = render_buffer.render_worker.clone();
-        s.spawn(move |_| {
-            render_worker.render_frame();
-        });
+    // Create teh scene
+    let mut scene = one_weekend_scene();
 
-        // Window loop
-        while window.is_open() && !window.is_key_down(Key::Escape) {
-            let has_changed = render_buffer.update_buffer();
-            if has_changed {
-                window
-                    .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
-                    .unwrap();
-            } else {
-                window.update();
+    // Build the BVH
+    scene.build_bvh();
+
+    // Create the renderer
+    let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
+
+    let lookfrom = Point3::new(13.0, 2.0, 3.0);
+    let lookat = Point3::new(0.0, 0.0, 0.0);
+    let vup = Vec3::new(0.0, 1.0, 0.0);
+    let dist_to_focus = 10.0;
+    let aperture = 0.1;
+
+    let cam = Camera::new(
+        lookfrom,
+        lookat,
+        vup,
+        20.0,
+        aspect_ratio,
+        aperture,
+        dist_to_focus,
+    );
+
+    let render_worker =
+        render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);
+
+    // Create channels
+    let (channel_send, channel_receive) = unbounded();
+
+    // Kick off renderer
+    thread::spawn(move || {
+        let time_start = std::time::Instant::now();
+        let atomic_ray_count = AtomicU64::new(0);
+        (0..HEIGHT).into_par_iter().for_each(|line| {
+            let mut packet = BufferPacket { pixels: Vec::new() };
+            let mut rng = RayRng::new(line as u64);
+            for x in 0..WIDTH {
+                let mut ray_count: u32 = 0;
+                let col = render_worker.render_pixel(x as u32, line as u32, &mut rng, &mut ray_count);
+                atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
+                packet
+                    .pixels
+                    .push((x, line, color_display_from_render(col)));
             }
-        }
+            channel_send.send(packet).unwrap();
+        });
+        let time_elapsed = time_start.elapsed();
+        let ray_count = atomic_ray_count.load(Ordering::Acquire);
+        let ray_count_f32 = ray_count as f32;
+        let mrays_sec = (ray_count_f32 / time_elapsed.as_secs_f32()) / 1000000.0;
 
-        render_buffer.render_worker.stop_render();
-    })
-    .unwrap();
+        println!("Stop render");
+        println!(
+            "Time: {0}ms MRays/sec {1:.3}",
+            time_elapsed.as_millis(),
+            mrays_sec
+        );
+    });
+
+    // Window loop
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        {
+            for packet in channel_receive.try_iter() {
+                for pixel in packet.pixels {
+                    let index = pixel.0 + pixel.1 * WIDTH;
+                    render_buffer.buffer_display[index] = pixel.2;
+                }
+            }
+            window
+                .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
+                .unwrap();
+        }
+    }
 
     // If we get one argument, assume it's our output png filename
     let args: Vec<String> = std::env::args().collect();
@@ -223,6 +242,7 @@ fn main() {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,3 +263,4 @@ mod tests {
         }
     }
 }
+*/

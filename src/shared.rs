@@ -1,4 +1,4 @@
-pub use bvh::aabb::{Bounded, AABB};
+pub use bvh::aabb::{Aabb, Bounded};
 pub use bvh::bounding_hierarchy::{BHShape, BoundingHierarchy};
 pub use glam::Vec3;
 use rand::Rng;
@@ -80,7 +80,7 @@ impl RayRng {
     }
 
     pub fn gen_range(&mut self, range: std::ops::Range<f32>) -> f32 {
-        self.rng.gen_range(range)
+        self.rng.random_range(range)
     }
 }
 
@@ -174,4 +174,12 @@ pub fn color_random_range(rng: &mut RayRng, range: std::ops::Range<f32>) -> Colo
         rng.gen_range(range.clone()),
         rng.gen_range(range),
     )
+}
+
+pub fn point_to_nalgebra(p: Point3) -> nalgebra::Point3<f32> {
+    return nalgebra::Point3::new(p.x, p.y, p.z);
+}
+
+pub fn vec_to_nalgebra(p: Vec3) -> nalgebra::Vector3<f32> {
+    return nalgebra::Vector3::new(p.x, p.y, p.z);
 }

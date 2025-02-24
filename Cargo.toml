@@ -7,18 +7,13 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-minifb = "0.19.3"
-crossbeam = "0.8.1"
-crossbeam-channel = "0.5.1"
-glam = "0.18.0"
-scoped_threadpool = "0.1.9"
-bvh = "0.6.0"
-rand = "0.8.4"
-spiral = "0.1.9"
-png = "0.17.2"
-num_cpus = "1.13.0"
-rand_xoshiro = "0.6.0"
-
-[profile.release]
-lto = true
-codegen-units = 1
+minifb = "0.28.0"
+glam = "0.30.0"
+nalgebra = "0.33.2"
+bvh = "0.11.0"
+rand = "0.9.0"
+png = "0.17.16"
+num_cpus = "1.16.0"
+rand_xoshiro = "0.7.0"
+rayon = "1.10.0"
+crossbeam-channel = "0.5.14"
