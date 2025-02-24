@@ -5,10 +5,11 @@ mod render;
 mod scene;
 mod shared;
 
-use std::thread;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
 
 use camera::*;
 use material::*;
@@ -16,9 +17,9 @@ use object::*;
 use scene::*;
 use shared::*;
 
-use rayon::prelude::*;
 use crossbeam_channel::unbounded;
 use minifb::{Key, Window, WindowOptions};
+use rayon::prelude::*;
 
 const WIDTH: usize = 1280;
 const HEIGHT: usize = 720;
@@ -123,7 +124,7 @@ impl RenderBuffer {
 }
 
 struct BufferPacket {
-    pixels: Vec<(usize, usize, ColorDisplay)>
+    pixels: Vec<(usize, usize, ColorDisplay)>,
 }
 
 fn main() {
@@ -176,10 +177,10 @@ fn main() {
 
     // Kick off renderer
     thread::spawn(move || {
+        let time_start = std::time::Instant::now();
+        let atomic_ray_count = AtomicU64::new(0);
         for line in 0..HEIGHT {
-            let mut packet= BufferPacket {
-                pixels: Vec::new()
-            };
+            let mut packet = BufferPacket { pixels: Vec::new() };
             let start = line * WIDTH;
             let end = start + WIDTH;
             (start..end)
@@ -187,11 +188,25 @@ fn main() {
                 .map(|index| {
                     let x = index % WIDTH;
                     let y = index / WIDTH;
-                    let col = render_worker.render_pixel(x as u32, y as u32);
+                    let mut ray_count: u32 = 0;
+                    let col = render_worker.render_pixel(x as u32, y as u32, &mut ray_count);
+                    atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
                     (x, y, color_display_from_render(col))
-                }).collect_into_vec(&mut packet.pixels);
+                })
+                .collect_into_vec(&mut packet.pixels);
             channel_send.send(packet).unwrap();
         }
+        let time_elapsed = time_start.elapsed();
+        let ray_count = atomic_ray_count.load(Ordering::Acquire);
+        let ray_count_f32 = ray_count as f32;
+        let mrays_sec = (ray_count_f32 / time_elapsed.as_secs_f32()) / 1000000.0;
+
+        println!("Stop render");
+        println!(
+            "Time: {0}ms MRays/sec {1:.3}",
+            time_elapsed.as_millis(),
+            mrays_sec
+        );
     });
 
     // Window loop
@@ -204,8 +219,8 @@ fn main() {
                 }
             }
             window
-            .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
-            .unwrap();
+                .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
+                .unwrap();
         }
     }
 

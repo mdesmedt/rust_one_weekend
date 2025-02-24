@@ -64,7 +64,7 @@ impl Renderer {
         }
     }
 
-    pub fn render_pixel(&self, x: u32, y: u32) -> Color {
+    pub fn render_pixel(&self, x: u32, y: u32, ray_count: &mut u32) -> Color {
         let mut rng = RayRng::new(0);
 
         // Set up supersampling
@@ -74,15 +74,13 @@ impl Renderer {
         let u_rand = 1.0 / (self.image_width as f32 - 1.0);
         let v_rand = 1.0 / (self.image_height as f32 - 1.0);
 
-        let mut ray_count = 0;
-
         // Supersample this pixel
         for _ in 0..self.samples_per_pixel {
             let u = u_base + rng.gen_range(0.0..u_rand);
             let v = v_base + rng.gen_range(0.0..v_rand);
             let ray = self.camera.get_ray(&mut rng, u, v);
             // Start the primary here from here
-            color_accum += ray_color(&mut rng, ray, &self.scene, self.max_depth, &mut ray_count);
+            color_accum += ray_color(&mut rng, ray, &self.scene, self.max_depth, ray_count);
         }
         color_accum /= self.samples_per_pixel as f32;
 
