@@ -181,9 +181,10 @@ fn main() {
         let atomic_ray_count = AtomicU64::new(0);
         (0..HEIGHT).into_par_iter().for_each(|line| {
             let mut packet = BufferPacket { pixels: Vec::new() };
+            let mut rng = RayRng::new(line as u64);
             for x in 0..WIDTH {
                 let mut ray_count: u32 = 0;
-                let col = render_worker.render_pixel(x as u32, line as u32, &mut ray_count);
+                let col = render_worker.render_pixel(x as u32, line as u32, &mut rng, &mut ray_count);
                 atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
                 packet
                     .pixels

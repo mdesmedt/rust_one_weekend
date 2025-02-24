@@ -43,10 +43,10 @@ impl Scene {
             let origin = point_to_nalgebra(query.ray.origin);
             let direction = vec_to_nalgebra(query.ray.direction);
             let bvh_ray = bvh::ray::Ray::new(origin, direction);
-            let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
+            let nearest = bvh.nearest_traverse_iterator(&bvh_ray, &self.bounds);
 
             // Iterate over hit objects to find closest
-            for bounds in hit_bounds {
+            for bounds in nearest {
                 let obj = self.objects[bounds.hittable_index].as_ref();
                 let hit_option = obj.intersect(query);
                 if hit_option.is_some() {

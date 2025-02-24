@@ -2,6 +2,13 @@ use crate::camera::*;
 use crate::scene::*;
 use crate::shared::*;
 
+struct RayState {
+    x: u32,
+    y: u32,
+    ray: Ray,
+    depth: i32,
+}
+
 /// Recursive ray tracing
 fn ray_color(rng: &mut RayRng, ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
     if depth <= 0 {
@@ -64,9 +71,7 @@ impl Renderer {
         }
     }
 
-    pub fn render_pixel(&self, x: u32, y: u32, ray_count: &mut u32) -> Color {
-        let mut rng = RayRng::new(0);
-
+    pub fn render_pixel(&self, x: u32, y: u32, rng: &mut RayRng, ray_count: &mut u32) -> Color {
         // Set up supersampling
         let mut color_accum = Color::ZERO;
         let u_base = x as f32 / (self.image_width as f32 - 1.0);
@@ -78,9 +83,9 @@ impl Renderer {
         for _ in 0..self.samples_per_pixel {
             let u = u_base + rng.gen_range(0.0..u_rand);
             let v = v_base + rng.gen_range(0.0..v_rand);
-            let ray = self.camera.get_ray(&mut rng, u, v);
+            let ray = self.camera.get_ray(rng, u, v);
             // Start the primary here from here
-            color_accum += ray_color(&mut rng, ray, &self.scene, self.max_depth, ray_count);
+            color_accum += ray_color(rng, ray, &self.scene, self.max_depth, ray_count);
         }
         color_accum /= self.samples_per_pixel as f32;
 
