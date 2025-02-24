@@ -31,18 +31,18 @@ impl HitRecord {
 /// Bounds for RayHittable
 #[derive(Copy, Clone)]
 pub struct HittableBounds {
-    aabb: AABB,
+    aabb: Aabb<f32, 3>,
     node_index: usize,
     pub hittable_index: usize,
 }
 
-impl Bounded for HittableBounds {
-    fn aabb(&self) -> AABB {
+impl Bounded<f32, 3> for HittableBounds {
+    fn aabb(&self) -> Aabb<f32, 3> {
         self.aabb
     }
 }
 
-impl BHShape for HittableBounds {
+impl BHShape<f32, 3> for HittableBounds {
     fn set_bh_node_index(&mut self, index: usize) {
         self.node_index = index;
     }
@@ -112,9 +112,9 @@ impl RayHittable for Sphere {
 
     fn compute_bounds(&self, hittable_index: usize) -> HittableBounds {
         let half_size = Vec3::new(self.radius, self.radius, self.radius);
-        let min = self.center - half_size;
-        let max = self.center + half_size;
-        let aabb = AABB::with_bounds(min, max);
+        let min = point_to_nalgebra(self.center - half_size);
+        let max = point_to_nalgebra(self.center + half_size);
+        let aabb = Aabb::with_bounds(min, max);
 
         HittableBounds {
             aabb,

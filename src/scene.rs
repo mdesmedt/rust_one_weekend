@@ -1,7 +1,7 @@
 use crate::object::*;
 use crate::shared::*;
 
-use bvh::bvh::BVH;
+use bvh::bvh::Bvh;
 
 /// Basic scene which holds objects and a BVH
 pub struct Scene {
@@ -12,7 +12,7 @@ pub struct Scene {
     pub bounds: Vec<HittableBounds>,
 
     // Acceleration structure
-    pub bvh: Option<BVH>,
+    pub bvh: Option<Bvh<f32, 3>>,
 }
 
 impl Scene {
@@ -27,10 +27,11 @@ impl Scene {
     pub fn build_bvh(&mut self) {
         // Compute bounds
         for (i, hittable) in self.objects.iter().enumerate() {
-            self.bounds.push(hittable.compute_bounds(i));
+            let bounds = hittable.compute_bounds(i);
+            self.bounds.push(bounds);
         }
         // Build BVH
-        self.bvh = Some(BVH::build(&mut self.bounds));
+        self.bvh = Some(Bvh::build(&mut self.bounds));
     }
 
     /// Return the closest intersection (or None) in the scene using the ray
@@ -39,7 +40,9 @@ impl Scene {
 
         if let Some(bvh) = &self.bvh {
             // Traverse the BVH
-            let bvh_ray = bvh::ray::Ray::new(query.ray.origin, query.ray.direction);
+            let origin = point_to_nalgebra(query.ray.origin);
+            let direction = vec_to_nalgebra(query.ray.direction);
+            let bvh_ray = bvh::ray::Ray::new(origin, direction);
             let hit_bounds = bvh.traverse_iterator(&bvh_ray, &self.bounds);
 
             // Iterate over hit objects to find closest
