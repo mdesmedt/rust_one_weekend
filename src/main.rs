@@ -8,7 +8,6 @@ mod shared;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::thread;
 
 use camera::*;
@@ -18,8 +17,8 @@ use scene::*;
 use shared::*;
 
 use crossbeam_channel::unbounded;
+
 use minifb::{Key, Window, WindowOptions};
-use rayon::prelude::*;
 
 const WIDTH: usize = 1280;
 const HEIGHT: usize = 720;
@@ -126,7 +125,7 @@ fn main() {
     // Create render buffer which holds all useful structs for rendering
     let mut buffer_display: Vec<ColorDisplay> = vec![0; WIDTH * HEIGHT];
 
-    // Create teh scene
+    // Create the scene
     let mut scene = one_weekend_scene();
 
     // Build the BVH
@@ -151,47 +150,16 @@ fn main() {
         dist_to_focus,
     );
 
-    let render_worker =
-        render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);
-
     // Create channels
     let (channel_send, channel_receive) = unbounded();
 
+    // Create renderer
+    let render_worker =
+        render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);
+
     // Kick off renderer
     thread::spawn(move || {
-        println!("Start render");
-        let time_start = std::time::Instant::now();
-        let atomic_ray_count = AtomicU64::new(0);
-        let atomic_line = AtomicU32::new(0);
-
-        (0..HEIGHT).into_par_iter().for_each(|_| {
-            let line = atomic_line.fetch_add(1, Ordering::Relaxed);
-            let mut packet = BufferPacket {
-                pixels: Vec::with_capacity(WIDTH),
-            };
-            let mut rng = RayRng::new(line as u64);
-            for x in 0..WIDTH as u32 {
-                let mut ray_count: u32 = 0;
-                let col = render_worker.render_pixel(x, line, &mut rng, &mut ray_count);
-                atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
-                packet
-                    .pixels
-                    .push((x, line, color_display_from_render(col)));
-            }
-            channel_send.send(packet).unwrap();
-        });
-
-        let time_elapsed = time_start.elapsed();
-        let ray_count = atomic_ray_count.load(Ordering::Acquire);
-        let ray_count_f32 = ray_count as f32;
-        let mrays_sec = (ray_count_f32 / time_elapsed.as_secs_f32()) / 1000000.0;
-
-        println!("Stop render");
-        println!(
-            "Time: {0}ms MRays/sec {1:.3}",
-            time_elapsed.as_millis(),
-            mrays_sec
-        );
+        render_worker.render_frame(channel_send);
     });
 
     // Window loop
@@ -230,7 +198,6 @@ fn main() {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,17 +205,69 @@ mod tests {
     /// Tests if two renders produce exactly the same image
     #[test]
     fn test_determnism() {
-        let mut render_buffer_a = RenderBuffer::new(100, 100, 8);
-        render_buffer_a.render_worker.render_frame();
-        render_buffer_a.update_buffer();
-        let mut render_buffer_b = RenderBuffer::new(100, 100, 8);
-        render_buffer_b.render_worker.render_frame();
-        render_buffer_b.update_buffer();
-        for i in 0..render_buffer_a.buffer_display.len() {
-            let a = render_buffer_a.buffer_display[i];
-            let b = render_buffer_a.buffer_display[i];
+        let width = 100;
+        let height = 100;
+        let spp = 8;
+
+        // Create the scene
+        let mut scene = one_weekend_scene();
+
+        // Build the BVH
+        scene.build_bvh();
+
+        // Create the renderer
+        let aspect_ratio = (width as f32) / (height as f32);
+
+        let lookfrom = Point3::new(13.0, 2.0, 3.0);
+        let lookat = Point3::new(0.0, 0.0, 0.0);
+        let vup = Vec3::new(0.0, 1.0, 0.0);
+        let dist_to_focus = 10.0;
+        let aperture = 0.1;
+
+        let cam = Camera::new(
+            lookfrom,
+            lookat,
+            vup,
+            20.0,
+            aspect_ratio,
+            aperture,
+            dist_to_focus,
+        );
+
+        // Create renderer
+        let render_worker =
+            render::Renderer::new(width as u32, height as u32, spp, scene, cam);
+
+        let mut buffer_display_a: Vec<ColorDisplay> = vec![0; width * height];
+        {
+            let (channel_send, channel_receive) = unbounded();
+            render_worker.render_frame(channel_send);
+            let packets: Vec<BufferPacket> = channel_receive.iter().collect();
+            for packet in packets {
+                for pixel in packet.pixels {
+                    let index = pixel.0 as usize + pixel.1 as usize * width;
+                    buffer_display_a[index] = pixel.2;
+                }
+            }
+        }
+
+        let mut buffer_display_b: Vec<ColorDisplay> = vec![0; width * height];
+        {
+            let (channel_send, channel_receive) = unbounded();
+            render_worker.render_frame(channel_send);
+            let packets: Vec<BufferPacket> = channel_receive.iter().collect();
+            for packet in packets {
+                for pixel in packet.pixels {
+                    let index = pixel.0 as usize + pixel.1 as usize * width;
+                    buffer_display_b[index] = pixel.2;
+                }
+            }
+        }
+
+        for i in 0..buffer_display_a.len() {
+            let a = buffer_display_a[i];
+            let b = buffer_display_b[i];
             assert_eq!(a, b);
         }
     }
 }
-*/

@@ -1,6 +1,10 @@
 use crate::camera::*;
 use crate::scene::*;
 use crate::shared::*;
+use crate::BufferPacket;
+use crossbeam_channel::Sender;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use rayon::prelude::*;
 
 /// Recursive ray tracing
 fn ray_color(rng: &mut RayRng, ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
@@ -43,7 +47,7 @@ pub struct Renderer {
     scene: Scene,
     camera: Camera,
     samples_per_pixel: u32,
-    max_depth: i32,
+    max_depth: i32
 }
 
 impl Renderer {
@@ -52,7 +56,7 @@ impl Renderer {
         image_height: u32,
         samples_per_pixel: u32,
         scene: Scene,
-        camera: Camera,
+        camera: Camera
     ) -> Self {
         Renderer {
             image_width,
@@ -60,7 +64,7 @@ impl Renderer {
             scene,
             camera,
             samples_per_pixel,
-            max_depth: 50,
+            max_depth: 50
         }
     }
 
@@ -83,5 +87,43 @@ impl Renderer {
         color_accum /= self.samples_per_pixel as f32;
 
         color_accum
+    }
+
+    pub fn render_frame(&self, channel_send: Sender<BufferPacket>) {
+        println!("Start render");
+        let time_start = std::time::Instant::now();
+        let atomic_ray_count = AtomicU64::new(0);
+        let atomic_line = AtomicU32::new(0);
+
+        (0..self.image_height).into_par_iter().for_each(|_| {
+            let line = atomic_line.fetch_add(1, Ordering::Relaxed);
+            let mut packet = BufferPacket {
+                pixels: Vec::with_capacity(self.image_width as usize),
+            };
+            let mut rng = RayRng::new(line as u64);
+            for x in 0..self.image_width as u32 {
+                let mut ray_count: u32 = 0;
+                let col = self.render_pixel(x, line, &mut rng, &mut ray_count);
+                atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
+                packet
+                    .pixels
+                    .push((x, line, color_display_from_render(col)));
+            }
+            channel_send.send(packet).unwrap();
+        });
+
+        let time_elapsed = time_start.elapsed();
+        let ray_count = atomic_ray_count.load(Ordering::Acquire);
+        let ray_count_f32 = ray_count as f32;
+        let mrays_sec = (ray_count_f32 / time_elapsed.as_secs_f32()) / 1000000.0;
+
+        println!("Stop render");
+        println!(
+            "Time: {0}ms MRays/sec {1:.3}",
+            time_elapsed.as_millis(),
+            mrays_sec
+        );
+
+        drop(channel_send);
     }
 }
