@@ -13,10 +13,6 @@ pub type ColorDisplay = u32;
 pub const TRACE_EPSILON: f32 = 0.001;
 pub const TRACE_INFINITY: f32 = f32::MAX;
 
-pub fn index_from_xy(image_width: u32, _image_height: u32, x: u32, y: u32) -> usize {
-    (y * image_width + x) as usize
-}
-
 /// A minimal ray
 #[derive(Copy, Clone)]
 pub struct Ray {
@@ -149,10 +145,6 @@ pub fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
     let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
     r0 = r0 * r0;
     r0 + (1.0 - r0) * ((1.0 - cosine).powf(5.0))
-}
-
-pub fn ceil_div(x: u32, y: u32) -> u32 {
-    (x + y - 1) / y
 }
 
 pub fn random_in_unit_disk(rng: &mut RayRng) -> Vec3 {

@@ -105,24 +105,6 @@ fn one_weekend_scene() -> Scene {
     scene
 }
 
-struct RenderBuffer {
-    buffer_display: Vec<ColorDisplay>,
-    width: usize,
-    height: usize,
-}
-
-impl RenderBuffer {
-    pub fn new(width: usize, height: usize, samples_per_pixel: u32) -> RenderBuffer {
-        let buffer_display: Vec<ColorDisplay> = vec![0; width * height];
-
-        RenderBuffer {
-            buffer_display,
-            width,
-            height,
-        }
-    }
-}
-
 struct BufferPacket {
     pixels: Vec<(usize, usize, ColorDisplay)>,
 }
@@ -142,7 +124,7 @@ fn main() {
     window.set_target_fps(30);
 
     // Create render buffer which holds all useful structs for rendering
-    let mut render_buffer = RenderBuffer::new(WIDTH, HEIGHT, SAMPLES_PER_PIXEL);
+    let mut buffer_display: Vec<ColorDisplay> = vec![0; WIDTH * HEIGHT];
 
     // Create teh scene
     let mut scene = one_weekend_scene();
@@ -211,11 +193,11 @@ fn main() {
             for packet in channel_receive.try_iter() {
                 for pixel in packet.pixels {
                     let index = pixel.0 + pixel.1 * WIDTH;
-                    render_buffer.buffer_display[index] = pixel.2;
+                    buffer_display[index] = pixel.2;
                 }
             }
             window
-                .update_with_buffer(&render_buffer.buffer_display, WIDTH, HEIGHT)
+                .update_with_buffer(&buffer_display, WIDTH, HEIGHT)
                 .unwrap();
         }
     }
@@ -233,8 +215,7 @@ fn main() {
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder.write_header().unwrap();
 
-        let data: Vec<u8> = render_buffer
-            .buffer_display
+        let data: Vec<u8> = buffer_display
             .iter()
             .flat_map(|x| u8_vec_from_color_display(*x))
             .collect();

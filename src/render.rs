@@ -2,13 +2,6 @@ use crate::camera::*;
 use crate::scene::*;
 use crate::shared::*;
 
-struct RayState {
-    x: u32,
-    y: u32,
-    ray: Ray,
-    depth: i32,
-}
-
 /// Recursive ray tracing
 fn ray_color(rng: &mut RayRng, ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
     if depth <= 0 {
