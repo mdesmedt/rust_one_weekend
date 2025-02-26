@@ -3,9 +3,11 @@ stdenv.mkDerivation {
   name = "env";
   nativeBuildInputs = [ pkg-config ];
   buildInputs = [
+    # Rust packages
     rustc
     cargo
     rustfmt
+    # Project packages
     wayland
     glfw-wayland
     libxkbcommon
@@ -15,4 +17,5 @@ stdenv.mkDerivation {
     glfw-wayland
     libxkbcommon
   ]);
+  RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
 }
