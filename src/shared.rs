@@ -175,3 +175,8 @@ pub fn point_to_nalgebra(p: Point3) -> nalgebra::Point3<f32> {
 pub fn vec_to_nalgebra(p: Vec3) -> nalgebra::Vector3<f32> {
     return nalgebra::Vector3::new(p.x, p.y, p.z);
 }
+
+pub fn smoothstep(left: f32, right: f32, x: f32) -> f32 {
+    let smooth_x = ((x - left) / (right - left)).clamp(0.0, 1.0);
+    smooth_x * smooth_x * (3.0 - 2.0 * smooth_x)
+}

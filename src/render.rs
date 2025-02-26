@@ -34,10 +34,24 @@ fn ray_color(rng: &mut RayRng, ray: Ray, scene: &Scene, depth: i32, ray_count: &
         return Color::ZERO;
     }
 
-    // Background
     let unit_direction = ray.direction.normalize();
+
+    // Simple sunlight
+    let sun_direction = Vec3::new(0.5, 0.4, 0.4).normalize();
+    let dot_sun = sun_direction.dot(unit_direction);
+    let sun_amount = smoothstep(0.99, 0.999, dot_sun);
+    let sunlight = sun_amount * Color::new(50.0, 50.0, 30.0); // Sun color
+
+    // Some sun haze with a smoothstep
+    let haze_amount = smoothstep(0.0, 1.0, dot_sun);
+    let haze = haze_amount * Color::new(0.2, 0.2, 0.1); // Haze color
+
+    // Sky
     let t = 0.5 * (unit_direction.y + 1.0);
-    (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+    let sky = (1.0 - t) * Color::new(0.8, 0.9, 1.0) + t * Color::new(0.5, 0.7, 1.0);
+
+    // Final background color
+    sky + sunlight + haze
 }
 
 /// Renderer which generates pixels using the scene and camera

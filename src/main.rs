@@ -22,7 +22,7 @@ use minifb::{Key, Window, WindowOptions};
 
 const WIDTH: usize = 1280;
 const HEIGHT: usize = 720;
-const SAMPLES_PER_PIXEL: u32 = 128;
+const SAMPLES_PER_PIXEL: u32 = 256;
 
 /// Generate the ray tracing in one weekend scene
 fn one_weekend_scene() -> Scene {
