@@ -3,8 +3,8 @@ use crate::scene::*;
 use crate::shared::*;
 use crate::BufferPacket;
 use crossbeam_channel::Sender;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 /// Recursive ray tracing
 fn ray_color(rng: &mut RayRng, ray: Ray, scene: &Scene, depth: i32, ray_count: &mut u32) -> Color {
@@ -47,7 +47,7 @@ pub struct Renderer {
     scene: Scene,
     camera: Camera,
     samples_per_pixel: u32,
-    max_depth: i32
+    max_depth: i32,
 }
 
 impl Renderer {
@@ -56,7 +56,7 @@ impl Renderer {
         image_height: u32,
         samples_per_pixel: u32,
         scene: Scene,
-        camera: Camera
+        camera: Camera,
     ) -> Self {
         Renderer {
             image_width,
@@ -64,7 +64,7 @@ impl Renderer {
             scene,
             camera,
             samples_per_pixel,
-            max_depth: 50
+            max_depth: 50,
         }
     }
 
@@ -96,19 +96,23 @@ impl Renderer {
         let atomic_line = AtomicU32::new(0);
 
         (0..self.image_height).into_par_iter().for_each(|_| {
+            // Grab a line using atomic add
             let line = atomic_line.fetch_add(1, Ordering::Relaxed);
+            // Initialize the result packet
             let mut packet = BufferPacket {
                 pixels: Vec::with_capacity(self.image_width as usize),
             };
+            // Initialize RNG
             let mut rng = RayRng::new(line as u64);
+            // Render the line
+            let mut ray_count: u32 = 0;
             for x in 0..self.image_width as u32 {
-                let mut ray_count: u32 = 0;
                 let col = self.render_pixel(x, line, &mut rng, &mut ray_count);
-                atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
                 packet
                     .pixels
                     .push((x, line, color_display_from_render(col)));
             }
+            atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
             channel_send.send(packet).unwrap();
         });
 

@@ -165,6 +165,7 @@ fn main() {
     // Window loop
     while window.is_open() && !window.is_key_down(Key::Escape) {
         {
+            // Non-blocking read loop from the channel
             for packet in channel_receive.try_iter() {
                 for pixel in packet.pixels {
                     let index = pixel.0 as usize + pixel.1 as usize * WIDTH;
@@ -235,8 +236,7 @@ mod tests {
         );
 
         // Create renderer
-        let render_worker =
-            render::Renderer::new(width as u32, height as u32, spp, scene, cam);
+        let render_worker = render::Renderer::new(width as u32, height as u32, spp, scene, cam);
 
         let mut buffer_display_a: Vec<ColorDisplay> = vec![0; width * height];
         {
