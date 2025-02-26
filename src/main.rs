@@ -119,7 +119,7 @@ fn main() {
         panic!("{}", e);
     });
 
-    // Limit to max ~10 fps update rate
+    // Limit to max ~30 fps update rate
     window.set_target_fps(30);
 
     // Create render buffer which holds all useful structs for rendering
@@ -131,7 +131,7 @@ fn main() {
     // Build the BVH
     scene.build_bvh();
 
-    // Create the renderer
+    // Set up the camera
     let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
 
     let lookfrom = Point3::new(13.0, 2.0, 3.0);
@@ -157,7 +157,7 @@ fn main() {
     let render_worker =
         render::Renderer::new(WIDTH as u32, HEIGHT as u32, SAMPLES_PER_PIXEL, scene, cam);
 
-    // Kick off renderer
+    // Kick off renderer in a thread so we can use the main thread to update the window
     thread::spawn(move || {
         render_worker.render_frame(channel_send);
     });
@@ -172,6 +172,7 @@ fn main() {
                     buffer_display[index] = pixel.2;
                 }
             }
+            // Update the window
             window
                 .update_with_buffer(&buffer_display, WIDTH, HEIGHT)
                 .unwrap();

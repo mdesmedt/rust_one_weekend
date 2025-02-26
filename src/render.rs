@@ -84,9 +84,9 @@ impl Renderer {
             // Start the primary here from here
             color_accum += ray_color(rng, ray, &self.scene, self.max_depth, ray_count);
         }
-        color_accum /= self.samples_per_pixel as f32;
 
-        color_accum
+        // Return color
+        color_accum / self.samples_per_pixel as f32
     }
 
     pub fn render_frame(&self, channel_send: Sender<BufferPacket>) {
@@ -95,6 +95,7 @@ impl Renderer {
         let atomic_ray_count = AtomicU64::new(0);
         let atomic_line = AtomicU32::new(0);
 
+        // Using rayon to parallelize the render
         (0..self.image_height).into_par_iter().for_each(|_| {
             // Grab a line using atomic add
             let line = atomic_line.fetch_add(1, Ordering::Relaxed);
@@ -112,6 +113,7 @@ impl Renderer {
                     .pixels
                     .push((x, line, color_display_from_render(col)));
             }
+            // Return results
             atomic_ray_count.fetch_add(ray_count as u64, Ordering::Relaxed);
             channel_send.send(packet).unwrap();
         });
