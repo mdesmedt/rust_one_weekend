@@ -2,7 +2,7 @@
 name = "one_weekend"
 version = "0.1.0"
 authors = ["Matthijs De Smedt <matthijsds@gmail.com>"]
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 minifb = "0.28.0"
